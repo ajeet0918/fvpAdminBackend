@@ -1,0 +1,525 @@
+package com.agriplatform.backend.service;
+
+import com.agriplatform.backend.dto.ConvertInquiryToLeadRequest;
+import com.agriplatform.backend.dto.CollectionHubInquiryRequest;
+import com.agriplatform.backend.dto.FarmerInquiryRequest;
+import com.agriplatform.backend.dto.InquiryRequest;
+import com.agriplatform.backend.dto.InquiryResponse;
+import com.agriplatform.backend.dto.InvestorInquiryRequest;
+import com.agriplatform.backend.dto.LeadResponse;
+import com.agriplatform.backend.dto.UpdateInquiryRequest;
+import com.agriplatform.backend.model.Inquiry;
+import com.agriplatform.backend.model.InquiryType;
+import com.agriplatform.backend.model.InquiryStatus;
+import com.agriplatform.backend.model.PaymentStatus;
+import com.agriplatform.backend.model.VerificationStatus;
+import com.agriplatform.backend.repository.InquiryRepository;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+@Service
+public class InquiryService {
+
+    private final InquiryRepository inquiryRepository;
+    private final LeadService leadService;
+    private final InquiryDocumentStorageService inquiryDocumentStorageService;
+
+    public InquiryService(
+            InquiryRepository inquiryRepository,
+            LeadService leadService,
+            InquiryDocumentStorageService inquiryDocumentStorageService
+    ) {
+        this.inquiryRepository = inquiryRepository;
+        this.leadService = leadService;
+        this.inquiryDocumentStorageService = inquiryDocumentStorageService;
+    }
+
+    @Transactional
+    public InquiryResponse createInquiry(InquiryRequest request) {
+        Inquiry inquiry = new Inquiry(
+                generateReferenceId(InquiryType.GENERAL),
+                request.fullName().trim(),
+                request.companyName().trim(),
+                request.email().trim().toLowerCase(),
+                request.phone().trim(),
+                request.productName().trim(),
+                request.message().trim()
+        );
+        return mapInquiry(inquiryRepository.save(inquiry));
+    }
+
+    @Transactional
+    public InquiryResponse createInvestorInquiry(
+            InvestorInquiryRequest request,
+            MultipartFile idProof,
+            MultipartFile paymentScreenshot
+    ) {
+        LocalDate investmentDate = parseDate(request.investmentDate(), "investmentDate");
+        LocalDate paymentDate = parseDateNullable(request.paymentDate(), "paymentDate");
+        String idProofUrl = inquiryDocumentStorageService.store(idProof, "investor");
+        String paymentScreenshotUrl = inquiryDocumentStorageService.store(paymentScreenshot, "investor");
+
+        String transactionId = normalizeNullable(request.transactionId());
+        boolean hasPaymentEvidence = transactionId != null || paymentDate != null || paymentScreenshotUrl != null;
+        String agreementId = hasPaymentEvidence ? generateAgreementId() : null;
+
+        String summaryMessage = normalizeNullable(request.notes());
+        if (summaryMessage == null) {
+            summaryMessage = "Investor submission from public website.";
+        }
+
+        Inquiry inquiry = Inquiry.createInvestor(
+                generateReferenceId(InquiryType.INVESTOR),
+                request.fullName().trim(),
+                request.fatherName().trim(),
+                request.email().trim().toLowerCase(),
+                request.mobileNumber().trim(),
+                request.aadhaarNumber().trim(),
+                request.panNumber().trim(),
+                request.fullAddress().trim(),
+                request.investmentAmount(),
+                investmentDate,
+                normalizeNullable(request.preferredPaymentMode()),
+                transactionId,
+                paymentDate,
+                "WEBSITE_INVESTOR",
+                summaryMessage,
+                idProofUrl,
+                paymentScreenshotUrl,
+                request.termsAccepted(),
+                agreementId
+        );
+        return mapInquiry(inquiryRepository.save(inquiry));
+    }
+
+    @Transactional
+    public InquiryResponse createFarmerInquiry(
+            FarmerInquiryRequest request,
+            MultipartFile aadhaarDocument,
+            MultipartFile landProofDocument,
+            MultipartFile bankPassbookDocument
+    ) {
+        if (aadhaarDocument == null || aadhaarDocument.isEmpty()) {
+            throw new IllegalArgumentException("Aadhaar upload is required for farmer registration");
+        }
+
+        String aadhaarDocumentUrl = inquiryDocumentStorageService.store(aadhaarDocument, "farmer");
+        String landProofDocumentUrl = inquiryDocumentStorageService.store(landProofDocument, "farmer");
+        String bankPassbookDocumentUrl = inquiryDocumentStorageService.store(bankPassbookDocument, "farmer");
+
+        String summaryMessage = normalizeNullable(request.notes());
+        if (summaryMessage == null) {
+            summaryMessage = "Farmer onboarding submission from public website.";
+        }
+
+        Inquiry inquiry = Inquiry.createFarmer(
+                generateReferenceId(InquiryType.FARMER),
+                request.fullName().trim(),
+                request.fatherName().trim(),
+                request.email().trim().toLowerCase(),
+                request.mobileNumber().trim(),
+                normalizeNullable(request.alternateNumber()),
+                request.aadhaarNumber().trim(),
+                request.address().trim(),
+                request.village().trim(),
+                request.district().trim(),
+                request.state().trim(),
+                request.pinCode().trim(),
+                request.farmingType().trim(),
+                request.landArea().trim(),
+                request.mainCrops().trim(),
+                request.irrigationType().trim(),
+                normalizeNullable(request.bankAccountNumber()),
+                normalizeUpperNullable(request.ifscCode()),
+                "WEBSITE_FARMER",
+                summaryMessage,
+                aadhaarDocumentUrl,
+                landProofDocumentUrl,
+                bankPassbookDocumentUrl,
+                request.termsAccepted()
+        );
+
+        return mapInquiry(inquiryRepository.save(inquiry));
+    }
+
+    @Transactional
+    public InquiryResponse createCollectionHubInquiry(
+            CollectionHubInquiryRequest request,
+            MultipartFile hubDocument
+    ) {
+        String hubDocumentUrl = inquiryDocumentStorageService.store(hubDocument, "collection-hub");
+        String summaryMessage = normalizeNullable(request.notes());
+        if (summaryMessage == null) {
+            summaryMessage = "Collection hub onboarding submission from public website.";
+        }
+
+        Inquiry inquiry = Inquiry.createCollectionHub(
+                generateReferenceId(InquiryType.COLLECTION_HUB),
+                request.fullName().trim(),
+                request.fatherName().trim(),
+                request.email().trim().toLowerCase(Locale.ROOT),
+                request.mobileNumber().trim(),
+                normalizeNullable(request.alternateNumber()),
+                request.aadhaarNumber().trim(),
+                request.address().trim(),
+                request.village().trim(),
+                request.district().trim(),
+                request.state().trim(),
+                request.pinCode().trim(),
+                request.collectionHubName().trim(),
+                request.storageType().trim(),
+                request.capacityMt(),
+                request.pickupRadiusKm(),
+                request.operatingDays().trim(),
+                "WEBSITE_COLLECTION_HUB",
+                summaryMessage,
+                hubDocumentUrl,
+                request.termsAccepted(),
+                generateHubCode()
+        );
+
+        return mapInquiry(inquiryRepository.save(inquiry));
+    }
+
+    @Transactional(readOnly = true)
+    public List<InquiryResponse> getInquiries(
+            String search,
+            String status,
+            String source,
+            String assignedTo,
+            String inquiryType
+    ) {
+        String normalizedSearch = normalizeSearch(search);
+        InquiryStatus statusFilter = parseStatusNullable(status);
+        String sourceFilter = normalizeUpperNullable(source);
+        String assignedToFilter = resolveAssignedToFilter(assignedTo);
+        InquiryType inquiryTypeFilter = parseInquiryTypeNullable(inquiryType);
+
+        return inquiryRepository.findAll().stream()
+                .filter(inquiry -> matchesSearch(inquiry, normalizedSearch))
+                .filter(inquiry -> statusFilter == null || inquiry.getStatus() == statusFilter)
+                .filter(inquiry -> sourceFilter == null || sourceFilter.equalsIgnoreCase(inquiry.getSource()))
+                .filter(inquiry -> assignedToFilter == null || containsIgnoreCase(inquiry.getAssignedTo(), assignedToFilter))
+                .filter(inquiry -> inquiryTypeFilter == null || resolveInquiryType(inquiry) == inquiryTypeFilter)
+                .sorted(Comparator.comparing(Inquiry::getCreatedAt).reversed())
+                .map(this::mapInquiry)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public InquiryResponse getInquiry(Long id) {
+        Inquiry inquiry = inquiryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Inquiry not found"));
+        return mapInquiry(inquiry);
+    }
+
+    @Transactional
+    public InquiryResponse updateInquiry(Long id, UpdateInquiryRequest request) {
+        Inquiry inquiry = inquiryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Inquiry not found"));
+
+        VerificationStatus verificationStatus = parseVerificationStatusNullable(request.verificationStatus());
+        PaymentStatus paymentStatus = parsePaymentStatusNullable(request.paymentStatus());
+        String agreementId = normalizeNullable(request.agreementId());
+        InquiryType resolvedType = resolveInquiryType(inquiry);
+        if (agreementId == null
+                && resolvedType == InquiryType.INVESTOR
+                && (paymentStatus == PaymentStatus.RECEIVED || paymentStatus == PaymentStatus.VERIFIED)
+                && inquiry.getAgreementId() == null) {
+            agreementId = generateAgreementId();
+        }
+
+        inquiry.updateStatus(
+                parseStatus(request.status()),
+                verificationStatus,
+                paymentStatus,
+                normalizeNullable(request.adminNotes()),
+                normalizeAssignedToForActor(request.assignedTo()),
+                agreementId,
+                request.committedReturnAmount(),
+                normalizeNullable(request.farmerActionNote()),
+                normalizeNullable(request.hubActionNote())
+        );
+        return mapInquiry(inquiryRepository.save(inquiry));
+    }
+
+    @Transactional
+    public InquiryResponse convertToLead(Long inquiryId, ConvertInquiryToLeadRequest request) {
+        Inquiry inquiry = inquiryRepository.findById(inquiryId)
+                .orElseThrow(() -> new IllegalArgumentException("Inquiry not found"));
+
+        if (inquiry.getConvertedLeadId() != null || inquiry.getStatus() == InquiryStatus.CONVERTED) {
+            throw new IllegalArgumentException("Inquiry already converted");
+        }
+
+        String leadNotes = normalizeNullable(request.leadNotes());
+        String assignedTo = normalizeAssignedToForActor(request.assignedTo());
+
+        LeadResponse lead = leadService.createLeadFromInquiry(
+                inquiry.getFullName(),
+                inquiry.getEmail(),
+                inquiry.getPhone(),
+                inquiry.getCompanyName(),
+                leadNotes != null ? leadNotes : inquiry.getMessage(),
+                assignedTo,
+                inquiry.getId()
+        );
+
+        inquiry.markConverted(
+                lead.id(),
+                leadNotes != null ? leadNotes : "Converted to lead",
+                assignedTo
+        );
+        return mapInquiry(inquiryRepository.save(inquiry));
+    }
+
+    private InquiryResponse mapInquiry(Inquiry inquiry) {
+        return new InquiryResponse(
+                inquiry.getId(),
+                resolveInquiryType(inquiry).name(),
+                inquiry.getReferenceId(),
+                inquiry.getFullName(),
+                inquiry.getCompanyName(),
+                inquiry.getEmail(),
+                inquiry.getPhone(),
+                inquiry.getAlternatePhone(),
+                inquiry.getFatherName(),
+                inquiry.getAadhaarNumber(),
+                inquiry.getPanNumber(),
+                inquiry.getFullAddress(),
+                inquiry.getProductName(),
+                inquiry.getMessage(),
+                inquiry.getInvestmentAmount(),
+                inquiry.getInvestmentDate(),
+                inquiry.getPreferredPaymentMode(),
+                inquiry.getTransactionId(),
+                inquiry.getPaymentDate(),
+                inquiry.getFarmingType(),
+                inquiry.getLandArea(),
+                inquiry.getMainCrops(),
+                inquiry.getIrrigationType(),
+                inquiry.getBankAccountNumber(),
+                inquiry.getIfscCode(),
+                inquiry.getVillage(),
+                inquiry.getDistrict(),
+                inquiry.getFarmerState(),
+                inquiry.getPinCode(),
+                inquiry.getCollectionHubName(),
+                inquiry.getHubStorageType(),
+                inquiry.getHubCapacityMt(),
+                inquiry.getHubPickupRadiusKm(),
+                inquiry.getHubOperatingDays(),
+                inquiry.getHubCode(),
+                inquiry.getIdProofUrl(),
+                inquiry.getPaymentScreenshotUrl(),
+                inquiry.getAadhaarDocumentUrl(),
+                inquiry.getLandProofDocumentUrl(),
+                inquiry.getBankPassbookDocumentUrl(),
+                inquiry.getHubDocumentUrl(),
+                inquiry.isTermsAccepted(),
+                inquiry.getAgreementId(),
+                inquiry.getCommittedReturnAmount(),
+                inquiry.getFarmerActionNote(),
+                inquiry.getHubActionNote(),
+                resolveVerificationStatus(inquiry).name(),
+                resolvePaymentStatus(inquiry).name(),
+                inquiry.getSource(),
+                inquiry.getAdminNotes(),
+                inquiry.getAssignedTo(),
+                inquiry.getConvertedLeadId(),
+                inquiry.getStatus().name(),
+                inquiry.getCreatedAt(),
+                inquiry.getUpdatedAt()
+        );
+    }
+
+    private InquiryStatus parseStatus(String value) {
+        try {
+            return InquiryStatus.valueOf(value.trim().toUpperCase());
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid inquiry status");
+        }
+    }
+
+    private InquiryStatus parseStatusNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return parseStatus(value);
+    }
+
+    private VerificationStatus parseVerificationStatusNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return VerificationStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid verification status");
+        }
+    }
+
+    private PaymentStatus parsePaymentStatusNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return PaymentStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid payment status");
+        }
+    }
+
+    private InquiryType parseInquiryTypeNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return InquiryType.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid inquiry type filter");
+        }
+    }
+
+    private boolean matchesSearch(Inquiry inquiry, String search) {
+        if (search == null) {
+            return true;
+        }
+        return containsIgnoreCase(inquiry.getFullName(), search)
+                || containsIgnoreCase(inquiry.getCompanyName(), search)
+                || containsIgnoreCase(inquiry.getEmail(), search)
+                || containsIgnoreCase(inquiry.getPhone(), search)
+                || containsIgnoreCase(inquiry.getProductName(), search)
+                || containsIgnoreCase(inquiry.getMessage(), search)
+                || containsIgnoreCase(inquiry.getReferenceId(), search)
+                || containsIgnoreCase(inquiry.getTransactionId(), search)
+                || containsIgnoreCase(inquiry.getAgreementId(), search)
+                || containsIgnoreCase(inquiry.getCollectionHubName(), search)
+                || containsIgnoreCase(inquiry.getHubCode(), search)
+                || containsIgnoreCase(resolveInquiryType(inquiry).name(), search);
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toLowerCase();
+    }
+
+    private String normalizeUpperNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toUpperCase();
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private boolean containsIgnoreCase(String value, String search) {
+        return value != null && value.toLowerCase().contains(search);
+    }
+
+    private String resolveAssignedToFilter(String assignedTo) {
+        if ("SALES".equals(getCurrentRole())) {
+            return normalizeSearch(getCurrentUsername());
+        }
+        return normalizeSearch(assignedTo);
+    }
+
+    private String normalizeAssignedToForActor(String assignedTo) {
+        if ("SALES".equals(getCurrentRole())) {
+            return normalizeNullable(getCurrentUsername());
+        }
+        return normalizeNullable(assignedTo);
+    }
+
+    private String getCurrentRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return "";
+        }
+        return authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .map(authority -> authority.substring(5))
+                .findFirst()
+                .orElse("");
+    }
+
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : "";
+    }
+
+    private LocalDate parseDate(String value, String fieldName) {
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException(fieldName + " must be in YYYY-MM-DD format");
+        }
+    }
+
+    private LocalDate parseDateNullable(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return parseDate(value, fieldName);
+    }
+
+    private String generateReferenceId(InquiryType inquiryType) {
+        String prefix = switch (inquiryType) {
+            case GENERAL -> "INQ";
+            case INVESTOR -> "INV";
+            case FARMER -> "FAR";
+            case COLLECTION_HUB -> "HUB";
+        };
+
+        String datePrefix = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT));
+        String referenceId;
+        do {
+            int suffix = ThreadLocalRandom.current().nextInt(1000, 9999);
+            referenceId = "FVP-" + prefix + "-" + datePrefix + "-" + suffix;
+        } while (inquiryRepository.existsByReferenceId(referenceId));
+        return referenceId;
+    }
+
+    private String generateAgreementId() {
+        String datePrefix = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT));
+        int suffix = ThreadLocalRandom.current().nextInt(1000, 9999);
+        return "AGR-" + datePrefix + "-" + suffix;
+    }
+
+    private String generateHubCode() {
+        String datePrefix = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT));
+        int suffix = ThreadLocalRandom.current().nextInt(1000, 9999);
+        return "HUB-" + datePrefix + "-" + suffix;
+    }
+
+    private InquiryType resolveInquiryType(Inquiry inquiry) {
+        return inquiry.getInquiryType() == null ? InquiryType.GENERAL : inquiry.getInquiryType();
+    }
+
+    private VerificationStatus resolveVerificationStatus(Inquiry inquiry) {
+        return inquiry.getVerificationStatus() == null ? VerificationStatus.PENDING : inquiry.getVerificationStatus();
+    }
+
+    private PaymentStatus resolvePaymentStatus(Inquiry inquiry) {
+        return inquiry.getPaymentStatus() == null ? PaymentStatus.NOT_REQUIRED : inquiry.getPaymentStatus();
+    }
+}
