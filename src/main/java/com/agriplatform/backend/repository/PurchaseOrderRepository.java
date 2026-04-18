@@ -9,4 +9,5 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
     Optional<PurchaseOrder> findByOrderNumber(String orderNumber);
     boolean existsByOrderNumber(String orderNumber);
     List<PurchaseOrder> findByEmailIgnoreCaseOrPhoneOrderByCreatedAtDesc(String email, String phone);
+    List<PurchaseOrder> findByCustomer_IdOrderByCreatedAtDesc(Long customerId);
 }
