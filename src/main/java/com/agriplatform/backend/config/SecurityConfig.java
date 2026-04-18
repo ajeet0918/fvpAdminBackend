@@ -58,7 +58,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders", "/api/inquiries", "/api/inquiries/**", "/api/leads").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/track/**").permitAll()
                         .requestMatchers("/api/portal/**").hasRole("PORTAL_USER")
-                        .requestMatchers("/api/admin/leads/**", "/api/admin/inquiries/**", "/api/admin/owners")
+                        .requestMatchers(
+                                "/api/admin/leads/**",
+                                "/api/admin/inquiries/**",
+                                "/api/admin/customers/**",
+                                "/api/admin/investor-platform/**",
+                                "/api/admin/owners"
+                        )
                         .hasAnyRole("ADMIN", "SYSADMIN", "SALES")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SYSADMIN")
                         .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "SYSADMIN", "SALES")
