@@ -1,0 +1,142 @@
+package com.agriplatform.backend.investor.model;
+
+import com.agriplatform.backend.*;
+import com.agriplatform.backend.auth.controller.*;
+import com.agriplatform.backend.auth.dto.*;
+import com.agriplatform.backend.auth.service.*;
+import com.agriplatform.backend.category.controller.*;
+import com.agriplatform.backend.category.model.*;
+import com.agriplatform.backend.category.repository.*;
+import com.agriplatform.backend.common.controller.*;
+import com.agriplatform.backend.config.*;
+import com.agriplatform.backend.customer.controller.*;
+import com.agriplatform.backend.customer.dto.*;
+import com.agriplatform.backend.customer.model.*;
+import com.agriplatform.backend.customer.repository.*;
+import com.agriplatform.backend.customer.service.*;
+import com.agriplatform.backend.document.controller.*;
+import com.agriplatform.backend.document.dto.*;
+import com.agriplatform.backend.document.model.*;
+import com.agriplatform.backend.document.repository.*;
+import com.agriplatform.backend.document.service.*;
+import com.agriplatform.backend.inquiry.controller.*;
+import com.agriplatform.backend.inquiry.dto.*;
+import com.agriplatform.backend.inquiry.model.*;
+import com.agriplatform.backend.inquiry.repository.*;
+import com.agriplatform.backend.inquiry.service.*;
+import com.agriplatform.backend.investor.controller.*;
+import com.agriplatform.backend.investor.dto.*;
+import com.agriplatform.backend.investor.model.*;
+import com.agriplatform.backend.investor.repository.*;
+import com.agriplatform.backend.investor.service.*;
+import com.agriplatform.backend.lead.controller.*;
+import com.agriplatform.backend.lead.dto.*;
+import com.agriplatform.backend.lead.model.*;
+import com.agriplatform.backend.lead.repository.*;
+import com.agriplatform.backend.lead.service.*;
+import com.agriplatform.backend.order.controller.*;
+import com.agriplatform.backend.order.dto.*;
+import com.agriplatform.backend.order.model.*;
+import com.agriplatform.backend.order.repository.*;
+import com.agriplatform.backend.order.service.*;
+import com.agriplatform.backend.portal.controller.*;
+import com.agriplatform.backend.portal.dto.*;
+import com.agriplatform.backend.portal.model.*;
+import com.agriplatform.backend.portal.repository.*;
+import com.agriplatform.backend.portal.service.*;
+import com.agriplatform.backend.product.controller.*;
+import com.agriplatform.backend.product.dto.*;
+import com.agriplatform.backend.product.model.*;
+import com.agriplatform.backend.product.repository.*;
+import com.agriplatform.backend.product.service.*;
+import com.agriplatform.backend.security.*;
+import com.agriplatform.backend.user.controller.*;
+import com.agriplatform.backend.user.dto.*;
+import com.agriplatform.backend.user.model.*;
+import com.agriplatform.backend.user.repository.*;
+import com.agriplatform.backend.user.service.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "investor_receipt")
+public class InvestorReceipt {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "payout_id")
+    private InvestorPayout payout;
+
+    @Column(nullable = false, unique = true, length = 40)
+    private String receiptNumber;
+
+    @Column(length = 500)
+    private String documentUrl;
+
+    @Column(nullable = false)
+    private Integer version;
+
+    @Column(length = 120)
+    private String generatedBy;
+
+    @Column(nullable = false)
+    private LocalDateTime generatedAt;
+
+    public InvestorReceipt() {
+    }
+
+    public InvestorReceipt(
+            InvestorPayout payout,
+            String receiptNumber,
+            String documentUrl,
+            Integer version,
+            String generatedBy
+    ) {
+        this.payout = payout;
+        this.receiptNumber = receiptNumber;
+        this.documentUrl = documentUrl;
+        this.version = version;
+        this.generatedBy = generatedBy;
+        this.generatedAt = LocalDateTime.now();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public InvestorPayout getPayout() {
+        return payout;
+    }
+
+    public String getReceiptNumber() {
+        return receiptNumber;
+    }
+
+    public String getDocumentUrl() {
+        return documentUrl;
+    }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public String getGeneratedBy() {
+        return generatedBy;
+    }
+
+    public LocalDateTime getGeneratedAt() {
+        return generatedAt;
+    }
+}
