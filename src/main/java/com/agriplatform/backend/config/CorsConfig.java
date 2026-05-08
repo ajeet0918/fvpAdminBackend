@@ -78,6 +78,10 @@ public class CorsConfig {
                         "http://127.0.0.1:4173",
                         "http://localhost:4174",
                         "http://127.0.0.1:4174",
+                        "http://staging.fvppurepick.com",
+                        "https://staging.fvppurepick.com",
+                        "http://admin-staging.fvppurepick.com",
+                        "https://admin-staging.fvppurepick.com",
                         "https://fvppurepick.com",
                         "https://www.fvppurepick.com",
                         "https://admin.fvppurepick.com"
