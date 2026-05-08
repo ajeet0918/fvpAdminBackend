@@ -50,13 +50,18 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/customer/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/cashfree/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/portal/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/orders", "/api/inquiries", "/api/inquiries/**", "/api/leads").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/api/products", "/api/products/**", "/api/categories", "/api/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**", "/api/categories", "/api/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/inquiries", "/api/inquiries/**", "/api/leads").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/track/**").permitAll()
+                        .requestMatchers("/api/customer/me/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/portal/**").hasRole("PORTAL_USER")
                         .requestMatchers(
                                 "/api/admin/leads/**",
@@ -64,8 +69,7 @@ public class SecurityConfig {
                                 "/api/admin/customers/**",
                                 "/api/admin/investor-platform/**",
                                 "/api/admin/owners"
-                        )
-                        .hasAnyRole("ADMIN", "SYSADMIN", "SALES")
+                        ).hasAnyRole("ADMIN", "SYSADMIN", "SALES")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SYSADMIN")
                         .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "SYSADMIN", "SALES")
                         .anyRequest().authenticated()
