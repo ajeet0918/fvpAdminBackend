@@ -88,13 +88,26 @@ public class CorsConfig {
                 };
 
                 registry.addMapping("/api/**")
-                        .allowedOrigins(
-                                allowedOrigins
+                        .allowedOrigins(allowedOrigins)
+                        .allowedOriginPatterns(
+                                "http://localhost:*",
+                                "http://127.0.0.1:*",
+                                "http://*.fvppurepick.com",
+                                "https://*.fvppurepick.com"
                         )
-                        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+                        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+                        .allowedHeaders("*")
+                        .exposedHeaders("*");
 
                 registry.addMapping("/uploads/**")
                         .allowedOrigins(allowedOrigins)
+                        .allowedOriginPatterns(
+                                "http://localhost:*",
+                                "http://127.0.0.1:*",
+                                "http://*.fvppurepick.com",
+                                "https://*.fvppurepick.com"
+                        )
+                        .allowedHeaders("*")
                         .allowedMethods("GET", "OPTIONS");
             }
         };
