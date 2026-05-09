@@ -1,92 +1,62 @@
 package com.agriplatform.backend.document.service;
 
-import com.agriplatform.backend.*;
-import com.agriplatform.backend.auth.controller.*;
-import com.agriplatform.backend.auth.dto.*;
-import com.agriplatform.backend.auth.service.*;
-import com.agriplatform.backend.category.controller.*;
-import com.agriplatform.backend.category.model.*;
-import com.agriplatform.backend.category.repository.*;
-import com.agriplatform.backend.common.controller.*;
-import com.agriplatform.backend.config.*;
-import com.agriplatform.backend.customer.controller.*;
-import com.agriplatform.backend.customer.dto.*;
-import com.agriplatform.backend.customer.model.*;
-import com.agriplatform.backend.customer.repository.*;
-import com.agriplatform.backend.customer.service.*;
-import com.agriplatform.backend.document.controller.*;
-import com.agriplatform.backend.document.dto.*;
-import com.agriplatform.backend.document.model.*;
-import com.agriplatform.backend.document.repository.*;
-import com.agriplatform.backend.document.service.*;
-import com.agriplatform.backend.inquiry.controller.*;
-import com.agriplatform.backend.inquiry.dto.*;
-import com.agriplatform.backend.inquiry.model.*;
-import com.agriplatform.backend.inquiry.repository.*;
-import com.agriplatform.backend.inquiry.service.*;
-import com.agriplatform.backend.investor.controller.*;
-import com.agriplatform.backend.investor.dto.*;
-import com.agriplatform.backend.investor.model.*;
-import com.agriplatform.backend.investor.repository.*;
-import com.agriplatform.backend.investor.service.*;
-import com.agriplatform.backend.lead.controller.*;
-import com.agriplatform.backend.lead.dto.*;
-import com.agriplatform.backend.lead.model.*;
-import com.agriplatform.backend.lead.repository.*;
-import com.agriplatform.backend.lead.service.*;
-import com.agriplatform.backend.order.controller.*;
-import com.agriplatform.backend.order.dto.*;
-import com.agriplatform.backend.order.model.*;
-import com.agriplatform.backend.order.repository.*;
-import com.agriplatform.backend.order.service.*;
-import com.agriplatform.backend.portal.controller.*;
-import com.agriplatform.backend.portal.dto.*;
-import com.agriplatform.backend.portal.model.*;
-import com.agriplatform.backend.portal.repository.*;
-import com.agriplatform.backend.portal.service.*;
-import com.agriplatform.backend.product.controller.*;
-import com.agriplatform.backend.product.dto.*;
-import com.agriplatform.backend.product.model.*;
-import com.agriplatform.backend.product.repository.*;
-import com.agriplatform.backend.product.service.*;
-import com.agriplatform.backend.security.*;
-import com.agriplatform.backend.user.controller.*;
-import com.agriplatform.backend.user.dto.*;
-import com.agriplatform.backend.user.model.*;
-import com.agriplatform.backend.user.repository.*;
-import com.agriplatform.backend.user.service.*;
-
+import com.agriplatform.backend.document.config.DocumentStorageProperties;
+import com.agriplatform.backend.document.config.DocumentStorageProvider;
+import com.agriplatform.backend.document.model.AppDocument;
+import com.agriplatform.backend.document.model.DocumentStatus;
+import com.agriplatform.backend.document.repository.AppDocumentRepository;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Service
 public class DocumentService {
 
+    private final DocumentStorageProperties storageProperties;
+    private final DocumentStorageProvider storageProvider;
     private final Path uploadBaseDir;
     private final AppDocumentRepository appDocumentRepository;
+    private final S3Client s3Client;
 
     public DocumentService(
-            @Value("${app.upload.base-dir:uploads}") String baseUploadDir,
-            AppDocumentRepository appDocumentRepository
+            DocumentStorageProperties storageProperties,
+            AppDocumentRepository appDocumentRepository,
+            ObjectProvider<S3Client> s3ClientProvider
     ) {
-        this.uploadBaseDir = Paths.get(baseUploadDir).toAbsolutePath().normalize();
+        this.storageProperties = storageProperties;
+        this.storageProvider = storageProperties.resolvedProvider();
+        this.uploadBaseDir = Paths.get(storageProperties.getLocalBaseDir()).toAbsolutePath().normalize();
         this.appDocumentRepository = appDocumentRepository;
+        this.s3Client = s3ClientProvider.getIfAvailable();
+
+        if (storageProvider == DocumentStorageProvider.S3) {
+            if (s3Client == null) {
+                throw new IllegalArgumentException("S3 storage provider selected but S3 client is not configured");
+            }
+            if (isBlank(storageProperties.getS3().getBucket())) {
+                throw new IllegalArgumentException("S3 storage provider selected but app.document.s3.bucket is missing");
+            }
+        }
     }
 
     @Transactional
@@ -96,32 +66,33 @@ public class DocumentService {
         String safeFolder = sanitizeFolder(request.folder());
         String extension = resolveExtension(file.getOriginalFilename(), file.getContentType());
         String storedFileName = UUID.randomUUID().toString().replace("-", "") + extension;
-        String objectKey = safeFolder + "/" + storedFileName;
-        Path targetPath = resolveTargetPath(objectKey);
+        String objectKey = buildObjectKey(safeFolder, storedFileName);
+        String contentType = normalizeNullable(file.getContentType());
 
         try {
-            Files.createDirectories(targetPath.getParent());
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (InputStream inputStream = new DigestInputStream(file.getInputStream(), digest)) {
-                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            byte[] content = file.getBytes();
+            String checksum = sha256Hex(content);
+
+            if (storageProvider == DocumentStorageProvider.S3) {
+                storeS3(objectKey, content, contentType);
+            } else {
+                storeLocal(objectKey, content);
             }
 
-            String checksum = toHex(digest.digest());
-            String publicPath = "/uploads/" + objectKey.replace('\\', '/');
-
+            String publicPath = resolvePublicPath(objectKey);
             AppDocument document = new AppDocument(
                     normalizeFileName(file.getOriginalFilename()),
-                    objectKey.replace('\\', '/'),
+                    objectKey,
                     publicPath,
-                    normalizeNullable(file.getContentType()),
+                    contentType,
                     file.getSize(),
                     checksum,
                     request.module().trim().toUpperCase(Locale.ROOT),
                     request.ownerId()
             );
             return appDocumentRepository.save(document);
-        } catch (IOException | NoSuchAlgorithmException ex) {
-            throw new IllegalArgumentException("Unable to store document");
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Unable to read document file");
         }
     }
 
@@ -136,6 +107,10 @@ public class DocumentService {
         AppDocument document = getById(id);
         if (document.getStatus() == DocumentStatus.DELETED) {
             throw new IllegalArgumentException("Document is deleted");
+        }
+
+        if (storageProvider == DocumentStorageProvider.S3) {
+            return downloadFromS3(document.getObjectKey());
         }
 
         Path targetPath = resolveTargetPath(document.getObjectKey());
@@ -160,11 +135,15 @@ public class DocumentService {
     public void delete(UUID id, boolean deletePhysicalFile) {
         AppDocument document = getById(id);
         if (deletePhysicalFile) {
-            Path targetPath = resolveTargetPath(document.getObjectKey());
-            try {
-                Files.deleteIfExists(targetPath);
-            } catch (IOException ex) {
-                throw new IllegalArgumentException("Unable to delete document file");
+            if (storageProvider == DocumentStorageProvider.S3) {
+                deleteFromS3(document.getObjectKey());
+            } else {
+                Path targetPath = resolveTargetPath(document.getObjectKey());
+                try {
+                    Files.deleteIfExists(targetPath);
+                } catch (IOException ex) {
+                    throw new IllegalArgumentException("Unable to delete document file");
+                }
             }
         }
         document.markDeleted();
@@ -194,6 +173,88 @@ public class DocumentService {
         if (!matchesImage && !matchesExact) {
             throw new IllegalArgumentException("Unsupported document file type");
         }
+    }
+
+    private void storeLocal(String objectKey, byte[] content) {
+        Path targetPath = resolveTargetPath(objectKey);
+        try {
+            Files.createDirectories(targetPath.getParent());
+            Files.write(targetPath, content);
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Unable to store document");
+        }
+    }
+
+    private void storeS3(String objectKey, byte[] content, String contentType) {
+        try {
+            PutObjectRequest.Builder requestBuilder = PutObjectRequest.builder()
+                    .bucket(storageProperties.getS3().getBucket().trim())
+                    .key(objectKey);
+            if (!isBlank(contentType)) {
+                requestBuilder.contentType(contentType.trim());
+            }
+            s3Client.putObject(requestBuilder.build(), RequestBody.fromBytes(content));
+        } catch (S3Exception ex) {
+            throw new IllegalArgumentException("Unable to store document in S3");
+        }
+    }
+
+    private Resource downloadFromS3(String objectKey) {
+        try {
+            byte[] bytes = s3Client.getObjectAsBytes(
+                    GetObjectRequest.builder()
+                            .bucket(storageProperties.getS3().getBucket().trim())
+                            .key(objectKey)
+                            .build()
+            ).asByteArray();
+            return new ByteArrayResource(bytes);
+        } catch (NoSuchKeyException ex) {
+            throw new IllegalArgumentException("Document file not found");
+        } catch (S3Exception ex) {
+            throw new IllegalArgumentException("Unable to read document file");
+        }
+    }
+
+    private void deleteFromS3(String objectKey) {
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(storageProperties.getS3().getBucket().trim())
+                    .key(objectKey)
+                    .build());
+        } catch (S3Exception ex) {
+            throw new IllegalArgumentException("Unable to delete document file");
+        }
+    }
+
+    private String buildObjectKey(String safeFolder, String storedFileName) {
+        String relative = safeFolder + "/" + storedFileName;
+        if (storageProvider != DocumentStorageProvider.S3) {
+            return relative;
+        }
+
+        String keyPrefix = normalizeS3Prefix(storageProperties.getS3().getKeyPrefix());
+        if (keyPrefix == null) {
+            return relative;
+        }
+        return keyPrefix + "/" + relative;
+    }
+
+    private String resolvePublicPath(String objectKey) {
+        if (storageProvider == DocumentStorageProvider.LOCAL) {
+            return "/uploads/" + objectKey.replace('\\', '/');
+        }
+
+        String publicBaseUrl = normalizeNullable(storageProperties.getS3().getPublicBaseUrl());
+        if (publicBaseUrl != null) {
+            return trimTrailingSlash(publicBaseUrl) + "/" + objectKey;
+        }
+
+        String bucket = storageProperties.getS3().getBucket().trim();
+        String region = normalizeNullable(storageProperties.getS3().getRegion());
+        if (region != null) {
+            return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + objectKey;
+        }
+        return "https://" + bucket + ".s3.amazonaws.com/" + objectKey;
     }
 
     private Path resolveTargetPath(String objectKey) {
@@ -264,6 +325,31 @@ public class DocumentService {
         return value.trim();
     }
 
+    private String normalizeS3Prefix(String value) {
+        String normalized = normalizeNullable(value);
+        if (normalized == null) {
+            return null;
+        }
+        String clean = normalized
+                .replace('\\', '/')
+                .replaceAll("^/+", "")
+                .replaceAll("/+$", "");
+        return clean.isBlank() ? null : clean;
+    }
+
+    private String trimTrailingSlash(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private String sha256Hex(byte[] content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return toHex(digest.digest(content));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalArgumentException("Unable to calculate document checksum");
+        }
+    }
+
     private String toHex(byte[] bytes) {
         StringBuilder builder = new StringBuilder(bytes.length * 2);
         for (byte current : bytes) {
@@ -271,6 +357,10 @@ public class DocumentService {
             builder.append(Character.forDigit(current & 0xF, 16));
         }
         return builder.toString();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     public record UploadRequest(
@@ -288,4 +378,3 @@ public class DocumentService {
         }
     }
 }
-
