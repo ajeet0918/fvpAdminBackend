@@ -10,8 +10,8 @@ public class CashfreeProperties {
     private String apiVersion;
     private String clientId;
     private String clientSecret;
-    private String webhookSecret;
     private boolean enforceWebhookSignature;
+    private String webhookNotifyUrl;
 
     public boolean isEnabled() {
         return enabled;
@@ -53,19 +53,19 @@ public class CashfreeProperties {
         this.clientSecret = clientSecret;
     }
 
-    public String getWebhookSecret() {
-        return webhookSecret;
-    }
-
-    public void setWebhookSecret(String webhookSecret) {
-        this.webhookSecret = webhookSecret;
-    }
-
     public boolean isEnforceWebhookSignature() {
         return enforceWebhookSignature;
     }
 
     public void setEnforceWebhookSignature(boolean enforceWebhookSignature) {
         this.enforceWebhookSignature = enforceWebhookSignature;
+    }
+
+    public String getWebhookNotifyUrl() {
+        return webhookNotifyUrl;
+    }
+
+    public void setWebhookNotifyUrl(String webhookNotifyUrl) {
+        this.webhookNotifyUrl = webhookNotifyUrl;
     }
 }

@@ -5,12 +5,9 @@ import com.agriplatform.backend.order.service.OrderService;
 import com.agriplatform.backend.payment.config.CashfreeProperties;
 import com.agriplatform.backend.payment.model.OrderPaymentEvent;
 import com.agriplatform.backend.payment.repository.OrderPaymentEventRepository;
+import com.cashfree.pg.Cashfree;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,26 +73,39 @@ public class CashfreeWebhookService {
         if (timestamp == null || timestamp.isBlank()) {
             throw new IllegalArgumentException("Missing webhook timestamp");
         }
-        if (properties.getWebhookSecret() == null || properties.getWebhookSecret().isBlank()) {
-            throw new IllegalArgumentException("Webhook secret is not configured");
+        String verificationSecret = resolveWebhookVerificationSecret();
+        if (verificationSecret.isBlank()) {
+            throw new IllegalArgumentException("Cashfree client secret is not configured");
         }
 
-        String candidate = timestamp + payload;
-        String computed = hmacBase64(candidate, properties.getWebhookSecret());
-        if (!computed.equals(signature.trim())) {
-            throw new IllegalArgumentException("Invalid webhook signature");
+        try {
+            Cashfree cashfree = new Cashfree(
+                    resolveEnvironment(),
+                    properties.getApiVersion(),
+                    properties.getClientId(),
+                    verificationSecret,
+                    null,
+                    null
+            );
+            cashfree.PGVerifyWebhookSignature(signature.trim(), payload, timestamp.trim());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Invalid webhook signature", ex);
         }
     }
 
-    private String hmacBase64(String payload, String secret) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(hash);
-        } catch (Exception ex) {
-            throw new IllegalStateException("Unable to compute signature", ex);
+    private Cashfree.CFEnvironment resolveEnvironment() {
+        String baseUrl = properties.getBaseUrl();
+        if (baseUrl != null && baseUrl.toLowerCase().contains("sandbox")) {
+            return Cashfree.CFEnvironment.SANDBOX;
         }
+        return Cashfree.CFEnvironment.PRODUCTION;
+    }
+
+    private String resolveWebhookVerificationSecret() {
+        if (properties.getClientSecret() != null && !properties.getClientSecret().isBlank()) {
+            return properties.getClientSecret().trim();
+        }
+        return "";
     }
 
     private JsonNode parse(String payload) {
