@@ -4,16 +4,14 @@ import com.agriplatform.backend.customer.model.Customer;
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.payment.config.CashfreeProperties;
 import com.agriplatform.backend.payment.dto.CashfreeCreateOrderResult;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
+import com.cashfree.pg.Cashfree;
+import com.cashfree.pg.ApiException;
+import com.cashfree.pg.ApiResponse;
+import com.cashfree.pg.model.CreateOrderRequest;
+import com.cashfree.pg.model.CustomerDetails;
+import com.cashfree.pg.model.OrderEntity;
+import com.cashfree.pg.model.OrderMeta;
 import java.math.BigDecimal;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -21,140 +19,107 @@ import org.springframework.stereotype.Service;
 public class CashfreeGatewayService {
 
     private final CashfreeProperties properties;
-    private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
 
-    public CashfreeGatewayService(CashfreeProperties properties, ObjectMapper objectMapper) {
+    public CashfreeGatewayService(CashfreeProperties properties) {
         this.properties = properties;
-        this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newHttpClient();
     }
 
     public boolean isEnabled() {
-        return properties.isEnabled();
+        return properties.isEnabled()
+                && hasText(properties.getClientId())
+                && hasText(properties.getClientSecret());
     }
 
     public CashfreeCreateOrderResult createOrder(
             PurchaseOrder order,
             Customer customer,
             BigDecimal amount,
-            String successUrl,
-            String failureUrl
+            String checkoutSuccessUrl,
+            String checkoutFailureUrl
     ) {
-        if (!properties.isEnabled()) {
-            throw new IllegalStateException("Cashfree is not enabled");
-        }
-        if (isBlank(properties.getClientId()) || isBlank(properties.getClientSecret())) {
-            throw new IllegalStateException("Cashfree credentials are not configured");
-        }
-
-        String customerPhone = customer.getPhone() == null || customer.getPhone().isBlank()
-                ? "9999999999"
-                : customer.getPhone().trim();
-        String customerName = customer.getFullName() == null || customer.getFullName().isBlank()
-                ? "FVP Customer"
-                : customer.getFullName().trim();
-        String customerEmail = customer.getEmail() == null || customer.getEmail().isBlank()
-                ? "unknown@fvppurepick.com"
-                : customer.getEmail().trim();
-
-        String requestId = UUID.randomUUID().toString();
-        String payload = buildCreateOrderPayload(
-                order.getOrderNumber(),
-                amount,
-                customerName,
-                customerEmail,
-                customerPhone,
-                successUrl,
-                failureUrl
-        );
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(trimTrailingSlash(properties.getBaseUrl()) + CashfreeApiConstants.API_ORDERS_PATH))
-                .header(CashfreeApiConstants.HEADER_CONTENT_TYPE, "application/json")
-                .header(CashfreeApiConstants.HEADER_CLIENT_ID, properties.getClientId())
-                .header(CashfreeApiConstants.HEADER_CLIENT_SECRET, properties.getClientSecret())
-                .header(CashfreeApiConstants.HEADER_API_VERSION, defaultApiVersion())
-                .header(CashfreeApiConstants.HEADER_REQUEST_ID, requestId)
-                .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
-                .build();
-
-        HttpResponse<String> response;
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException | InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Unable to connect to Cashfree", ex);
-        }
-
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("Cashfree order creation failed: " + response.body());
+        if (!isEnabled()) {
+            throw new IllegalStateException("Cashfree gateway is disabled or not configured");
         }
 
         try {
-            JsonNode root = objectMapper.readTree(response.body());
-            String providerOrderId = text(root, CashfreeApiConstants.FIELD_CF_ORDER_ID);
-            String paymentSessionId = text(root, CashfreeApiConstants.FIELD_PAYMENT_SESSION_ID);
-            String paymentLink = text(root, CashfreeApiConstants.FIELD_PAYMENT_LINK);
-            if (providerOrderId.isBlank() || paymentSessionId.isBlank()) {
-                throw new IllegalStateException("Cashfree response missing order/session id");
+            Cashfree cashfree = new Cashfree(
+                    resolveEnvironment(),
+                    properties.getApiVersion(),
+                    properties.getClientId(),
+                    properties.getClientSecret(),
+                    null,
+                    null
+            );
+
+            CreateOrderRequest request = new CreateOrderRequest()
+                    .orderId(order.getOrderNumber())
+                    .orderCurrency(CashfreeApiConstants.CURRENCY_INR)
+                    .orderAmount(amount)
+                    .customerDetails(buildCustomer(customer))
+                    .orderMeta(buildOrderMeta(order, checkoutSuccessUrl, checkoutFailureUrl));
+
+            ApiResponse<OrderEntity> response = cashfree.PGCreateOrder(
+                    request,
+                    properties.getApiVersion(),
+                    UUID.randomUUID(),
+                    null
+            );
+            OrderEntity entity = response.getData();
+            if (entity == null || !hasText(entity.getCfOrderId()) || !hasText(entity.getPaymentSessionId())) {
+                throw new IllegalStateException("Cashfree response missing required order fields");
             }
-            return new CashfreeCreateOrderResult(providerOrderId, paymentSessionId, paymentLink);
-        } catch (IOException ex) {
-            throw new IllegalStateException("Invalid Cashfree response", ex);
+
+            return new CashfreeCreateOrderResult(
+                    entity.getCfOrderId(),
+                    entity.getPaymentSessionId(),
+                    ""
+            );
+        } catch (ApiException ex) {
+            String responseBody = ex.getResponseBody();
+            String errorMessage = hasText(responseBody) ? responseBody : ex.getMessage();
+            throw new IllegalStateException("Cashfree order creation failed: " + errorMessage, ex);
         }
     }
 
-    private String buildCreateOrderPayload(
-            String orderId,
-            BigDecimal amount,
-            String customerName,
-            String customerEmail,
-        String customerPhone,
-        String successUrl,
-        String failureUrl
-    ) {
-        ObjectNode root = objectMapper.createObjectNode();
-        root.put("order_id", orderId);
-        root.put("order_amount", amount == null ? BigDecimal.ZERO : amount);
-        root.put("order_currency", CashfreeApiConstants.CURRENCY_INR);
+    private CustomerDetails buildCustomer(Customer customer) {
+        return new CustomerDetails()
+                .customerId(String.valueOf(customer.getId()))
+                .customerName(customer.getFullName())
+                .customerEmail(customer.getEmail())
+                .customerPhone(customer.getPhone());
+    }
 
-        ObjectNode customerDetails = root.putObject("customer_details");
-        customerDetails.put("customer_id", orderId);
-        customerDetails.put("customer_name", customerName);
-        customerDetails.put("customer_email", customerEmail);
-        customerDetails.put("customer_phone", customerPhone);
+    private OrderMeta buildOrderMeta(PurchaseOrder order, String checkoutSuccessUrl, String checkoutFailureUrl) {
+        String fallbackUrl = hasText(checkoutFailureUrl) ? checkoutFailureUrl : checkoutSuccessUrl;
+        String returnUrl = hasText(checkoutSuccessUrl)
+                ? checkoutSuccessUrl + buildQueryDelimiter(checkoutSuccessUrl) + "order_id={order_id}"
+                : fallbackUrl;
 
-        ObjectNode orderMeta = root.putObject("order_meta");
-        orderMeta.put("return_url", successUrl + "?order_id={order_id}&order_token={order_token}");
-        orderMeta.put("notify_url", failureUrl);
+        return new OrderMeta()
+                .returnUrl(returnUrl)
+                .notifyUrl(resolveNotifyUrl());
+    }
 
-        try {
-            return objectMapper.writeValueAsString(root);
-        } catch (IOException ex) {
-            throw new IllegalStateException("Unable to serialize Cashfree order payload", ex);
+    private String resolveNotifyUrl() {
+        if (hasText(properties.getWebhookNotifyUrl())) {
+            return properties.getWebhookNotifyUrl();
         }
+        return "";
     }
 
-    private String defaultApiVersion() {
-        return isBlank(properties.getApiVersion()) ? CashfreeApiConstants.DEFAULT_API_VERSION : properties.getApiVersion().trim();
-    }
-
-    private String trimTrailingSlash(String value) {
-        if (value == null) {
-            return "";
+    private Cashfree.CFEnvironment resolveEnvironment() {
+        String baseUrl = properties.getBaseUrl();
+        if (baseUrl != null && baseUrl.toLowerCase().contains("sandbox")) {
+            return Cashfree.CFEnvironment.SANDBOX;
         }
-        String trimmed = value.trim();
-        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+        return Cashfree.CFEnvironment.PRODUCTION;
     }
 
-    private String text(JsonNode root, String field) {
-        JsonNode node = root.get(field);
-        return node == null ? "" : node.asText("").trim();
+    private String buildQueryDelimiter(String url) {
+        return url.contains("?") ? "&" : "?";
     }
 
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isBlank();
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
-
 }
