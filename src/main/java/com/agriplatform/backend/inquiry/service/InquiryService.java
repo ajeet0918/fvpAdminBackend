@@ -72,6 +72,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class InquiryService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InquiryService.class);
 
     private final InquiryRepository inquiryRepository;
     private final LeadService leadService;

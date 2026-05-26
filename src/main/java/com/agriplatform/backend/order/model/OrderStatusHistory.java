@@ -70,6 +70,7 @@ import java.time.LocalDateTime;
 
 @Entity
 public class OrderStatusHistory {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrderStatusHistory.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

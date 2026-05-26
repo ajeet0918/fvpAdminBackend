@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/customer/auth")
 public class CustomerAuthController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CustomerAuthController.class);
 
     private final CustomerAuthService customerAuthService;
 

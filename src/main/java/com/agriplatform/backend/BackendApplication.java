@@ -9,6 +9,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 @SpringBootApplication
 @EnableConfigurationProperties({CashfreeProperties.class, DocumentStorageProperties.class})
 public class BackendApplication {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BackendApplication.class);
 
     public static void main(String[] args) {
         SpringApplication.run(BackendApplication.class, args);

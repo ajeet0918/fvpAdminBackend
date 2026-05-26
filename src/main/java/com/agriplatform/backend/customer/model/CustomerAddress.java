@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 
 @Entity
 public class CustomerAddress {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CustomerAddress.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CustomerAuthService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CustomerAuthService.class);
 
     private static final String CUSTOMER_SUBJECT_PREFIX = "CUSTOMER:";
 

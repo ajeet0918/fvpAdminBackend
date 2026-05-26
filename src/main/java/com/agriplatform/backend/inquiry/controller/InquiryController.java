@@ -70,6 +70,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/inquiries")
 public class InquiryController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InquiryController.class);
 
     private final InquiryService inquiryService;
 

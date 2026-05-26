@@ -2,11 +2,11 @@ package com.agriplatform.backend.payment.service;
 
 import com.agriplatform.backend.customer.model.Customer;
 import com.agriplatform.backend.order.model.PurchaseOrder;
-import com.agriplatform.backend.payment.config.CashfreeProperties;
+import com.agriplatform.backend.payment.config.CashfreeRuntimeConfig;
 import com.agriplatform.backend.payment.dto.CashfreeCreateOrderResult;
-import com.cashfree.pg.Cashfree;
 import com.cashfree.pg.ApiException;
 import com.cashfree.pg.ApiResponse;
+import com.cashfree.pg.Cashfree;
 import com.cashfree.pg.model.CreateOrderRequest;
 import com.cashfree.pg.model.CustomerDetails;
 import com.cashfree.pg.model.OrderEntity;
@@ -17,17 +17,17 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CashfreeGatewayService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeGatewayService.class);
 
-    private final CashfreeProperties properties;
+    private final CashfreeSettingsResolver cashfreeSettingsResolver;
 
-    public CashfreeGatewayService(CashfreeProperties properties) {
-        this.properties = properties;
+    public CashfreeGatewayService(CashfreeSettingsResolver cashfreeSettingsResolver) {
+        this.cashfreeSettingsResolver = cashfreeSettingsResolver;
     }
 
     public boolean isEnabled() {
-        return properties.isEnabled()
-                && hasText(properties.getClientId())
-                && hasText(properties.getClientSecret());
+        CashfreeRuntimeConfig config = cashfreeSettingsResolver.resolve();
+        return config.enabled() && config.hasCredentials();
     }
 
     public CashfreeCreateOrderResult createOrder(
@@ -37,16 +37,17 @@ public class CashfreeGatewayService {
             String checkoutSuccessUrl,
             String checkoutFailureUrl
     ) {
-        if (!isEnabled()) {
+        CashfreeRuntimeConfig config = cashfreeSettingsResolver.resolve();
+        if (!config.enabled() || !config.hasCredentials()) {
             throw new IllegalStateException("Cashfree gateway is disabled or not configured");
         }
 
         try {
             Cashfree cashfree = new Cashfree(
-                    resolveEnvironment(),
-                    properties.getApiVersion(),
-                    properties.getClientId(),
-                    properties.getClientSecret(),
+                    resolveEnvironment(config),
+                    config.apiVersion(),
+                    config.clientId(),
+                    config.clientSecret(),
                     null,
                     null
             );
@@ -56,11 +57,11 @@ public class CashfreeGatewayService {
                     .orderCurrency(CashfreeApiConstants.CURRENCY_INR)
                     .orderAmount(amount)
                     .customerDetails(buildCustomer(customer))
-                    .orderMeta(buildOrderMeta(order, checkoutSuccessUrl, checkoutFailureUrl));
+                    .orderMeta(buildOrderMeta(config, checkoutSuccessUrl, checkoutFailureUrl));
 
             ApiResponse<OrderEntity> response = cashfree.PGCreateOrder(
                     request,
-                    properties.getApiVersion(),
+                    config.apiVersion(),
                     UUID.randomUUID(),
                     null
             );
@@ -89,29 +90,17 @@ public class CashfreeGatewayService {
                 .customerPhone(customer.getPhone());
     }
 
-    private OrderMeta buildOrderMeta(PurchaseOrder order, String checkoutSuccessUrl, String checkoutFailureUrl) {
+    private OrderMeta buildOrderMeta(CashfreeRuntimeConfig config, String checkoutSuccessUrl, String checkoutFailureUrl) {
         String fallbackUrl = hasText(checkoutFailureUrl) ? checkoutFailureUrl : checkoutSuccessUrl;
         String returnUrl = hasText(checkoutSuccessUrl)
                 ? checkoutSuccessUrl + buildQueryDelimiter(checkoutSuccessUrl) + "order_id={order_id}"
                 : fallbackUrl;
 
         return new OrderMeta()
-                .returnUrl(returnUrl)
-                .notifyUrl(resolveNotifyUrl());
+                .returnUrl(returnUrl);
     }
 
-    private String resolveNotifyUrl() {
-        if (hasText(properties.getWebhookNotifyUrl())) {
-            return properties.getWebhookNotifyUrl();
-        }
-        return "";
-    }
-
-    private Cashfree.CFEnvironment resolveEnvironment() {
-        String baseUrl = properties.getBaseUrl();
-        if (baseUrl != null && baseUrl.toLowerCase().contains("sandbox")) {
-            return Cashfree.CFEnvironment.SANDBOX;
-        }
+    private Cashfree.CFEnvironment resolveEnvironment(CashfreeRuntimeConfig config) {
         return Cashfree.CFEnvironment.PRODUCTION;
     }
 

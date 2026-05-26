@@ -70,11 +70,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/inquiries")
 public class AdminInquiryController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminInquiryController.class);
 
     private final InquiryService inquiryService;
+    private final PortalAccountService portalAccountService;
 
-    public AdminInquiryController(InquiryService inquiryService) {
+    public AdminInquiryController(InquiryService inquiryService, PortalAccountService portalAccountService) {
         this.inquiryService = inquiryService;
+        this.portalAccountService = portalAccountService;
     }
 
     @GetMapping
@@ -104,5 +107,10 @@ public class AdminInquiryController {
             @Valid @RequestBody ConvertInquiryToLeadRequest request
     ) {
         return inquiryService.convertToLead(id, request);
+    }
+
+    @PostMapping("/{id}/portal-user")
+    public PortalAccountInviteResponse createPortalUser(@PathVariable Long id) {
+        return portalAccountService.createOrResendInvite(id);
     }
 }

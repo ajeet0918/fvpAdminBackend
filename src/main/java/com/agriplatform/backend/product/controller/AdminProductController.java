@@ -76,6 +76,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/admin/products")
 public class AdminProductController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminProductController.class);
 
     private final AdminProductService adminProductService;
     private final ProductImageStorageService productImageStorageService;

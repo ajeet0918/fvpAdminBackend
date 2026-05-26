@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/payments/cashfree")
 public class CashfreeWebhookController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeWebhookController.class);
 
     private final CashfreeWebhookService cashfreeWebhookService;
 

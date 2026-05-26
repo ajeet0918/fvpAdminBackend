@@ -75,6 +75,7 @@ import java.util.List;
 
 @Entity
 public class PurchaseOrder {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PurchaseOrder.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

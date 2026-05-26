@@ -67,6 +67,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class JwtService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtService.class);
 
     private final SecretKey signingKey;
     private final long expirationMs;

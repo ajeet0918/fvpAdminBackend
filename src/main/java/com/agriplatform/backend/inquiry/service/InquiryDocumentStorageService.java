@@ -63,6 +63,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class InquiryDocumentStorageService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InquiryDocumentStorageService.class);
 
     private static final long MAX_FILE_SIZE = 10L * 1024L * 1024L;
 

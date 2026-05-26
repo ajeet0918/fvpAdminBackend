@@ -73,6 +73,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/investor-platform")
 public class AdminInvestorPlatformController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminInvestorPlatformController.class);
 
     private final InvestorPlatformService investorPlatformService;
 

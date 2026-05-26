@@ -84,6 +84,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InvestorPlatformService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InvestorPlatformService.class);
 
     private final InvestorAccountRepository investorAccountRepository;
     private final InvestmentRepository investmentRepository;

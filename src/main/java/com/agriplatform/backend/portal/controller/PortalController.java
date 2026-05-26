@@ -69,6 +69,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/portal")
 public class PortalController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PortalController.class);
 
     private final PortalSummaryService portalSummaryService;
 

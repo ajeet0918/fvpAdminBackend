@@ -9,6 +9,7 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
 
 @Configuration
 public class DocumentStorageConfig {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DocumentStorageConfig.class);
 
     @Bean
     @ConditionalOnProperty(prefix = "app.document", name = "storage-provider", havingValue = "S3")

@@ -67,6 +67,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PortalSummaryService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PortalSummaryService.class);
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final InquiryRepository inquiryRepository;
@@ -75,6 +76,7 @@ public class PortalSummaryService {
     private final InvestorMonthlyReturnRepository investorMonthlyReturnRepository;
     private final InvestorPayoutRepository investorPayoutRepository;
     private final InvestorReceiptRepository investorReceiptRepository;
+    private final PortalUserRepository portalUserRepository;
 
     public PortalSummaryService(
             PurchaseOrderRepository purchaseOrderRepository,
@@ -83,7 +85,8 @@ public class PortalSummaryService {
             InvestmentRepository investmentRepository,
             InvestorMonthlyReturnRepository investorMonthlyReturnRepository,
             InvestorPayoutRepository investorPayoutRepository,
-            InvestorReceiptRepository investorReceiptRepository
+            InvestorReceiptRepository investorReceiptRepository,
+            PortalUserRepository portalUserRepository
     ) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.inquiryRepository = inquiryRepository;
@@ -92,11 +95,12 @@ public class PortalSummaryService {
         this.investorMonthlyReturnRepository = investorMonthlyReturnRepository;
         this.investorPayoutRepository = investorPayoutRepository;
         this.investorReceiptRepository = investorReceiptRepository;
+        this.portalUserRepository = portalUserRepository;
     }
 
     @Transactional(readOnly = true)
     public PortalSummaryResponse getSummary(String identifierInput) {
-        String identifier = normalizeIdentifier(identifierInput);
+        String identifier = resolveIdentifier(identifierInput);
 
         List<PurchaseOrder> orders = purchaseOrderRepository.findByEmailIgnoreCaseOrPhoneOrderByCreatedAtDesc(identifier, identifier);
         List<Inquiry> inquiries = inquiryRepository.findByEmailIgnoreCaseOrPhoneOrderByCreatedAtDesc(identifier, identifier);
@@ -259,7 +263,7 @@ public class PortalSummaryService {
 
     @Transactional(readOnly = true)
     public String downloadReceipt(String identifierInput, String receiptNumber) {
-        String identifier = normalizeIdentifier(identifierInput);
+        String identifier = resolveIdentifier(identifierInput);
         InvestorReceipt receipt = investorReceiptRepository.findByReceiptNumber(receiptNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Receipt not found"));
         InvestorAccount account = receipt.getPayout().getInvestorAccount();
@@ -285,6 +289,30 @@ public class PortalSummaryService {
         );
     }
 
+    private String resolveIdentifier(String input) {
+        if (input != null && input.startsWith("PORTAL:")) {
+            Long portalUserId = parsePortalUserId(input);
+            PortalUser portalUser = portalUserRepository.findById(portalUserId)
+                    .orElseThrow(() -> new IllegalArgumentException("Portal user not found"));
+            if (hasText(portalUser.getEmail())) {
+                return normalizeIdentifier(portalUser.getEmail());
+            }
+            if (hasText(portalUser.getPhone())) {
+                return normalizeIdentifier(portalUser.getPhone());
+            }
+            throw new IllegalArgumentException("Portal user has no linked identifier");
+        }
+        return normalizeIdentifier(input);
+    }
+
+    private Long parsePortalUserId(String subject) {
+        try {
+            return Long.parseLong(subject.substring("PORTAL:".length()));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid portal token");
+        }
+    }
+
     private String normalizeIdentifier(String input) {
         if (input == null || input.isBlank()) {
             throw new IllegalArgumentException("Identifier is required");
@@ -294,6 +322,10 @@ public class PortalSummaryService {
             return value.toLowerCase(Locale.ROOT);
         }
         return value.replaceAll("\\s+", "");
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private BigDecimal scaleMoney(BigDecimal value) {

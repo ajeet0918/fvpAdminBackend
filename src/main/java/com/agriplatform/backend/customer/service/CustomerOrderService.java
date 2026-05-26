@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CustomerOrderService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CustomerOrderService.class);
 
     private final OrderService orderService;
     private final CustomerRepository customerRepository;

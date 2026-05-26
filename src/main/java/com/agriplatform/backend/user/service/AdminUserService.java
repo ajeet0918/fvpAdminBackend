@@ -66,6 +66,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminUserService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminUserService.class);
 
     private final AppRoleRepository appRoleRepository;
     private final AppUserRepository appUserRepository;

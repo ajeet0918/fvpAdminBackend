@@ -69,6 +69,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/customers")
 public class AdminCustomerController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminCustomerController.class);
 
     private final AdminCustomerService adminCustomerService;
 

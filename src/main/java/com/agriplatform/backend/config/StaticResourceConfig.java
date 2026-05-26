@@ -10,6 +10,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class StaticResourceConfig implements WebMvcConfigurer {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StaticResourceConfig.class);
 
     private final DocumentStorageProperties storageProperties;
 

@@ -64,6 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminProductService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminProductService.class);
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;

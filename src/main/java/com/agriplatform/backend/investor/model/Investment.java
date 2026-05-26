@@ -74,6 +74,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "investment")
 public class Investment {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Investment.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
