@@ -68,6 +68,7 @@ import java.time.LocalDateTime;
 
 @Entity
 public class AppUser {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AppUser.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

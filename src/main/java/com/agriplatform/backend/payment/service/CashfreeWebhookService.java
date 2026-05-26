@@ -2,7 +2,7 @@ package com.agriplatform.backend.payment.service;
 
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.service.OrderService;
-import com.agriplatform.backend.payment.config.CashfreeProperties;
+import com.agriplatform.backend.payment.config.CashfreeRuntimeConfig;
 import com.agriplatform.backend.payment.model.OrderPaymentEvent;
 import com.agriplatform.backend.payment.repository.OrderPaymentEventRepository;
 import com.cashfree.pg.Cashfree;
@@ -13,19 +13,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CashfreeWebhookService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeWebhookService.class);
 
-    private final CashfreeProperties properties;
+    private final CashfreeSettingsResolver cashfreeSettingsResolver;
     private final ObjectMapper objectMapper;
     private final OrderService orderService;
     private final OrderPaymentEventRepository orderPaymentEventRepository;
 
     public CashfreeWebhookService(
-            CashfreeProperties properties,
+            CashfreeSettingsResolver cashfreeSettingsResolver,
             ObjectMapper objectMapper,
             OrderService orderService,
             OrderPaymentEventRepository orderPaymentEventRepository
     ) {
-        this.properties = properties;
+        this.cashfreeSettingsResolver = cashfreeSettingsResolver;
         this.objectMapper = objectMapper;
         this.orderService = orderService;
         this.orderPaymentEventRepository = orderPaymentEventRepository;
@@ -33,8 +34,9 @@ public class CashfreeWebhookService {
 
     @Transactional
     public void processWebhook(String signature, String timestamp, String payload) {
-        if (properties.isEnforceWebhookSignature()) {
-            validateSignature(signature, timestamp, payload);
+        CashfreeRuntimeConfig config = cashfreeSettingsResolver.resolve();
+        if (config.enforceWebhookSignature()) {
+            validateSignature(config, signature, timestamp, payload);
         }
 
         JsonNode root = parse(payload);
@@ -66,24 +68,23 @@ public class CashfreeWebhookService {
         ));
     }
 
-    private void validateSignature(String signature, String timestamp, String payload) {
+    private void validateSignature(CashfreeRuntimeConfig config, String signature, String timestamp, String payload) {
         if (signature == null || signature.isBlank()) {
             throw new IllegalArgumentException("Missing webhook signature");
         }
         if (timestamp == null || timestamp.isBlank()) {
             throw new IllegalArgumentException("Missing webhook timestamp");
         }
-        String verificationSecret = resolveWebhookVerificationSecret();
-        if (verificationSecret.isBlank()) {
+        if (!hasText(config.clientSecret())) {
             throw new IllegalArgumentException("Cashfree client secret is not configured");
         }
 
         try {
             Cashfree cashfree = new Cashfree(
-                    resolveEnvironment(),
-                    properties.getApiVersion(),
-                    properties.getClientId(),
-                    verificationSecret,
+                    resolveEnvironment(config),
+                    config.apiVersion(),
+                    config.clientId(),
+                    config.clientSecret(),
                     null,
                     null
             );
@@ -93,19 +94,8 @@ public class CashfreeWebhookService {
         }
     }
 
-    private Cashfree.CFEnvironment resolveEnvironment() {
-        String baseUrl = properties.getBaseUrl();
-        if (baseUrl != null && baseUrl.toLowerCase().contains("sandbox")) {
-            return Cashfree.CFEnvironment.SANDBOX;
-        }
+    private Cashfree.CFEnvironment resolveEnvironment(CashfreeRuntimeConfig config) {
         return Cashfree.CFEnvironment.PRODUCTION;
-    }
-
-    private String resolveWebhookVerificationSecret() {
-        if (properties.getClientSecret() != null && !properties.getClientSecret().isBlank()) {
-            return properties.getClientSecret().trim();
-        }
-        return "";
     }
 
     private JsonNode parse(String payload) {
@@ -153,5 +143,9 @@ public class CashfreeWebhookService {
             return "";
         }
         return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

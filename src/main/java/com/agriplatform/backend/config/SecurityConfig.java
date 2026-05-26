@@ -20,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -57,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/payments/cashfree/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/portal/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/api/documents/public/**", "/api/documents/*/content").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/documents/public/**", "/api/documents/*/content").permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/products", "/api/products/**", "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**", "/api/categories", "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/inquiries", "/api/inquiries/**", "/api/leads").permitAll()

@@ -31,6 +31,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Service
 public class DocumentService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DocumentService.class);
+    private static final String PRODUCT_IMAGE_MODULE = "PRODUCT_IMAGE";
 
     private final DocumentStorageProperties storageProperties;
     private final DocumentStorageProvider storageProvider;
@@ -79,18 +81,20 @@ public class DocumentService {
                 storeLocal(objectKey, content);
             }
 
-            String publicPath = resolvePublicPath(objectKey);
+            String normalizedModule = request.module().trim().toUpperCase(Locale.ROOT);
             AppDocument document = new AppDocument(
                     normalizeFileName(file.getOriginalFilename()),
                     objectKey,
-                    publicPath,
+                    buildPendingPath(objectKey),
                     contentType,
                     file.getSize(),
                     checksum,
-                    request.module().trim().toUpperCase(Locale.ROOT),
+                    normalizedModule,
                     request.ownerId()
             );
-            return appDocumentRepository.save(document);
+            AppDocument saved = appDocumentRepository.save(document);
+            saved.updatePath(buildAccessPath(saved));
+            return appDocumentRepository.save(saved);
         } catch (IOException ex) {
             throw new IllegalArgumentException("Unable to read document file");
         }
@@ -118,6 +122,12 @@ public class DocumentService {
             throw new IllegalArgumentException("Document file not found");
         }
         return new FileSystemResource(targetPath);
+    }
+
+    public boolean isPublicDocument(AppDocument document) {
+        return document != null
+                && document.getStatus() == DocumentStatus.ACTIVE
+                && PRODUCT_IMAGE_MODULE.equalsIgnoreCase(normalizeNullable(document.getModule()));
     }
 
     @Transactional
@@ -239,22 +249,15 @@ public class DocumentService {
         return keyPrefix + "/" + relative;
     }
 
-    private String resolvePublicPath(String objectKey) {
-        if (storageProvider == DocumentStorageProvider.LOCAL) {
-            return "/uploads/" + objectKey.replace('\\', '/');
+    private String buildAccessPath(AppDocument document) {
+        if (isPublicDocument(document)) {
+            return "/api/documents/public/products/" + document.getId() + "/content";
         }
+        return "/api/admin/documents/" + document.getId() + "/content";
+    }
 
-        String publicBaseUrl = normalizeNullable(storageProperties.getS3().getPublicBaseUrl());
-        if (publicBaseUrl != null) {
-            return trimTrailingSlash(publicBaseUrl) + "/" + objectKey;
-        }
-
-        String bucket = storageProperties.getS3().getBucket().trim();
-        String region = normalizeNullable(storageProperties.getS3().getRegion());
-        if (region != null) {
-            return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + objectKey;
-        }
-        return "https://" + bucket + ".s3.amazonaws.com/" + objectKey;
+    private String buildPendingPath(String objectKey) {
+        return "pending:" + objectKey;
     }
 
     private Path resolveTargetPath(String objectKey) {
@@ -335,10 +338,6 @@ public class DocumentService {
                 .replaceAll("^/+", "")
                 .replaceAll("/+$", "");
         return clean.isBlank() ? null : clean;
-    }
-
-    private String trimTrailingSlash(String value) {
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
     private String sha256Hex(byte[] content) {

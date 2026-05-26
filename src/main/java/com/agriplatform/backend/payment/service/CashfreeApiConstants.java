@@ -3,6 +3,7 @@ package com.agriplatform.backend.payment.service;
 import java.util.Set;
 
 public final class CashfreeApiConstants {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeApiConstants.class);
 
     private CashfreeApiConstants() {
     }

@@ -65,6 +65,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LeadService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LeadService.class);
 
     private final LeadRepository leadRepository;
 

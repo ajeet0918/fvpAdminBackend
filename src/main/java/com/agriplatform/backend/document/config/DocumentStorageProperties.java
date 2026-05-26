@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.document")
 public class DocumentStorageProperties {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DocumentStorageProperties.class);
 
     private String storageProvider = "LOCAL";
     private String localBaseDir = "uploads";

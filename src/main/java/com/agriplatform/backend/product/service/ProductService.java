@@ -61,6 +61,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ProductService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProductService.class);
 
     private final ProductRepository productRepository;
 

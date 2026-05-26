@@ -64,6 +64,7 @@ import jakarta.persistence.Id;
 
 @Entity
 public class Category {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Category.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

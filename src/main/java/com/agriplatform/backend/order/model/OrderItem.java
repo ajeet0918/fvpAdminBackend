@@ -68,6 +68,7 @@ import java.math.BigDecimal;
 
 @Entity
 public class OrderItem {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrderItem.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

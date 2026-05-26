@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.cashfree")
 public class CashfreeProperties {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeProperties.class);
 
     private boolean enabled;
     private String baseUrl;
@@ -67,5 +68,47 @@ public class CashfreeProperties {
 
     public void setWebhookNotifyUrl(String webhookNotifyUrl) {
         this.webhookNotifyUrl = webhookNotifyUrl;
+    }
+
+    // Resolution policy: application properties first, environment variables second.
+    public boolean resolveEnabled() {
+        String env = System.getenv("CASHFREE_ENABLED");
+        if (env == null || env.isBlank()) {
+            return enabled;
+        }
+        if (enabled) {
+            return true;
+        }
+        return Boolean.parseBoolean(env.trim());
+    }
+
+    public String resolveBaseUrl() {
+        return firstNonBlank(baseUrl, System.getenv("CASHFREE_BASE_URL"));
+    }
+
+    public String resolveApiVersion() {
+        return firstNonBlank(apiVersion, System.getenv("CASHFREE_API_VERSION"));
+    }
+
+    public String resolveClientId() {
+        return firstNonBlank(clientId, System.getenv("CASHFREE_CLIENT_ID"));
+    }
+
+    public String resolveClientSecret() {
+        return firstNonBlank(clientSecret, System.getenv("CASHFREE_CLIENT_SECRET"));
+    }
+
+    public String resolveWebhookNotifyUrl() {
+        return firstNonBlank(webhookNotifyUrl, System.getenv("CASHFREE_WEBHOOK_NOTIFY_URL"));
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first.trim();
+        }
+        if (second != null && !second.isBlank()) {
+            return second.trim();
+        }
+        return "";
     }
 }

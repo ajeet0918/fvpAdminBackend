@@ -67,6 +67,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/leads")
 public class LeadController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LeadController.class);
 
     private final LeadService leadService;
 

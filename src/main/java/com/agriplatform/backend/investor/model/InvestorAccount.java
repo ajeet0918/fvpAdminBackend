@@ -69,6 +69,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "investor_account")
 public class InvestorAccount {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(InvestorAccount.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

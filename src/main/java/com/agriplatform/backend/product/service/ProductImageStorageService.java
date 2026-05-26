@@ -63,6 +63,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ProductImageStorageService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ProductImageStorageService.class);
 
     private static final long MAX_FILE_SIZE = 5L * 1024L * 1024L;
 

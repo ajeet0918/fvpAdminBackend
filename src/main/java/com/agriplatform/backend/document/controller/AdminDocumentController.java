@@ -76,6 +76,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/documents")
 public class AdminDocumentController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminDocumentController.class);
 
     private final DocumentService documentService;
 
@@ -92,6 +93,17 @@ public class AdminDocumentController {
     public ResponseEntity<Resource> downloadDocument(@PathVariable UUID id) {
         AppDocument document = documentService.getById(id);
         Resource resource = documentService.download(id);
+        return buildFileResponse(document, resource, true);
+    }
+
+    @GetMapping("/{id}/content")
+    public ResponseEntity<Resource> streamDocument(@PathVariable UUID id) {
+        AppDocument document = documentService.getById(id);
+        Resource resource = documentService.download(id);
+        return buildFileResponse(document, resource, false);
+    }
+
+    private ResponseEntity<Resource> buildFileResponse(AppDocument document, Resource resource, boolean attachment) {
 
         MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
         if (document.getContentType() != null && !document.getContentType().isBlank()) {
@@ -102,7 +114,10 @@ public class AdminDocumentController {
             }
         }
 
-        ContentDisposition contentDisposition = ContentDisposition.attachment()
+        ContentDisposition.Builder dispositionBuilder = attachment
+                ? ContentDisposition.attachment()
+                : ContentDisposition.inline();
+        ContentDisposition contentDisposition = dispositionBuilder
                 .filename(document.getOriginalFileName(), StandardCharsets.UTF_8)
                 .build();
 

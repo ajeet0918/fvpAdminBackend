@@ -72,6 +72,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "app_document")
 public class AppDocument {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AppDocument.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -204,6 +205,12 @@ public class AppDocument {
             this.module = module.trim().toUpperCase();
         }
         this.ownerId = ownerId;
+    }
+
+    public void updatePath(String path) {
+        if (path != null && !path.isBlank()) {
+            this.path = path.trim();
+        }
     }
 
     public void markDeleted() {
