@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SmtpConfigService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SmtpConfigService.class);
     private static final String SECRET_MASK = "********";
+    private static final Integer DEFAULT_SMTP_PORT = 587;
 
     private final SmtpConfigRepository smtpConfigRepository;
 
@@ -38,7 +39,7 @@ public class SmtpConfigService {
                 .orElseGet(() -> new SmtpConfig(
                         false,
                         "",
-                        587,
+                        DEFAULT_SMTP_PORT,
                         "",
                         "",
                         "",
@@ -50,10 +51,11 @@ public class SmtpConfigService {
                 ));
 
         validateRequiredFields(request, config);
+        Integer resolvedPort = request.port() == null ? DEFAULT_SMTP_PORT : request.port();
         config.update(
                 request.active(),
                 normalizeText(request.host()),
-                request.port() == null ? 587 : request.port(),
+                resolvedPort,
                 normalizeText(request.username()),
                 resolveNextPassword(config, request.password()),
                 normalizeText(request.fromEmail()),

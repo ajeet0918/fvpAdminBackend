@@ -57,6 +57,7 @@ import com.agriplatform.backend.user.repository.*;
 import com.agriplatform.backend.user.service.*;
 
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -80,7 +81,7 @@ public class ProductImageStorageService {
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new IllegalArgumentException("Image size must be less than or equal to 5 MB");
         }
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        String contentType = Objects.toString(file.getContentType(), "").toLowerCase(Locale.ROOT);
         if (!contentType.startsWith("image/")) {
             throw new IllegalArgumentException("Only image files are allowed");
         }
