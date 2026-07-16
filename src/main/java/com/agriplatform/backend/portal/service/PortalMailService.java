@@ -48,6 +48,18 @@ public class PortalMailService {
         send(config, portalUser.getEmail(), subject, body);
     }
 
+    public void sendTemporaryPasswordEmail(PortalUser portalUser, String temporaryPassword) {
+        SmtpConfig config = getReadyConfig(portalUser);
+        String subject = "FVP Purepick portal password recovery";
+        String body = "Hello " + portalUser.getUsername() + ",\n\n"
+                + "A temporary password has been created for your FVP Purepick partner portal account.\n"
+                + "Username: " + portalUser.getUsername() + "\n"
+                + "Temporary password: " + temporaryPassword + "\n\n"
+                + "After signing in with this temporary password, you must set a new password before using the portal.\n"
+                + "If you did not request this recovery, contact FVP Purepick support immediately.";
+        send(config, portalUser.getEmail(), subject, body);
+    }
+
     private SmtpConfig getReadyConfig(PortalUser portalUser) {
         if (!hasText(portalUser.getEmail())) {
             throw new IllegalArgumentException("Portal account email is required before sending credentials");

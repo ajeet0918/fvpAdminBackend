@@ -6,6 +6,7 @@ public record PortalAuthResponse(
         long expiresInSeconds,
         String role,
         String username,
-        String userType
+        String userType,
+        boolean resetPassword
 ) {
 }

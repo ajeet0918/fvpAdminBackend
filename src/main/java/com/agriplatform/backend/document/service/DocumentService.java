@@ -32,7 +32,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @Service
 public class DocumentService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DocumentService.class);
-    private static final String PRODUCT_IMAGE_MODULE = "PRODUCT_IMAGE";
+    public static final String PRODUCT_IMAGE_MODULE = "PRODUCT_IMAGE";
 
     private final DocumentStorageProperties storageProperties;
     private final DocumentStorageProvider storageProvider;
@@ -92,6 +92,7 @@ public class DocumentService {
                     normalizedModule,
                     request.ownerId()
             );
+            document.updateStorageProvider(storageProvider.name());
             AppDocument saved = appDocumentRepository.save(document);
             saved.updatePath(buildAccessPath(saved));
             return appDocumentRepository.save(saved);
@@ -251,7 +252,7 @@ public class DocumentService {
 
     private String buildAccessPath(AppDocument document) {
         if (isPublicDocument(document)) {
-            return "/api/documents/public/products/" + document.getId() + "/content";
+            return "/api/documents/" + document.getId() + "/content";
         }
         return "/api/admin/documents/" + document.getId() + "/content";
     }

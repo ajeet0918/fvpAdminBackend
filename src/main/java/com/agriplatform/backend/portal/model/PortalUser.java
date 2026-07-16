@@ -45,6 +45,9 @@ public class PortalUser {
     @Column(length = 255)
     private String passwordHash;
 
+    @Column(name = "reset_password", nullable = false)
+    private boolean resetPassword = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private PortalUserStatus status;
@@ -107,6 +110,10 @@ public class PortalUser {
         return passwordHash;
     }
 
+    public boolean isResetPassword() {
+        return resetPassword;
+    }
+
     public PortalUserStatus getStatus() {
         return status;
     }
@@ -138,8 +145,21 @@ public class PortalUser {
     public void activate(String passwordHash) {
         this.passwordHash = passwordHash;
         this.status = PortalUserStatus.ACTIVE;
+        this.resetPassword = false;
         this.activatedAt = LocalDateTime.now();
         this.updatedAt = this.activatedAt;
+    }
+
+    public void setTemporaryPassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.resetPassword = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.resetPassword = false;
+        this.updatedAt = LocalDateTime.now();
     }
 
     public void markLogin() {

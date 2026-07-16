@@ -92,6 +92,7 @@ public class ProductService {
                 product.getPrice(),
                 product.getPriceUnit() != null ? product.getPriceUnit() : "kg",
                 product.getStatus() != null ? product.getStatus().name() : "ACTIVE",
+                product.getImageDocument() != null ? product.getImageDocument().getId() : null,
                 product.getImageUrl(),
                 product.getShortDescription(),
                 product.getLongDescription(),

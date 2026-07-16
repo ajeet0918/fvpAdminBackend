@@ -152,6 +152,7 @@ public class AdminDocumentController {
                 document.getOriginalFileName(),
                 document.getObjectKey(),
                 document.getPath(),
+                document.getStorageProvider(),
                 document.getContentType(),
                 document.getSizeBytes(),
                 document.getChecksumSha256(),
