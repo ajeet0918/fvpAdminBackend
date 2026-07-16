@@ -93,7 +93,6 @@ public class DocumentService {
                     normalizedModule,
                     request.ownerId()
             );
-            document.updateStorageProvider(storageProvider.name());
             AppDocument saved = appDocumentRepository.save(document);
             saved.updatePath(buildAccessPath(saved));
             return appDocumentRepository.save(saved);
