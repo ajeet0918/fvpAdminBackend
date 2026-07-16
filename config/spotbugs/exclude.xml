@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Spring-managed dependencies and JPA relationships intentionally retain object references. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- Constructor validation is intentional for invalid runtime configuration. -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <!-- Public constant visibility is a style concern covered during review. -->
+    <Match>
+        <Bug pattern="MS_PKGPROTECT"/>
+    </Match>
+</FindBugsFilter>
