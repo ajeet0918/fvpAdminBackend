@@ -62,6 +62,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record CreateProductRequest(
         @NotBlank @Size(max = 255) String name,
@@ -72,6 +73,7 @@ public record CreateProductRequest(
         @NotNull @PositiveOrZero @DecimalMax("100.00") BigDecimal defaultTaxRate,
         @NotNull @PositiveOrZero @DecimalMax("100.00") BigDecimal defaultDiscountRate,
         @NotBlank @Size(max = 40) String status,
+        UUID imageDocumentId,
         @Size(max = 600) String imageUrl,
         @Size(max = 255) String imageOriginalFileName,
         @Size(max = 120) String imageContentType,

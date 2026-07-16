@@ -59,6 +59,7 @@ import com.agriplatform.backend.user.service.*;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,13 +69,16 @@ public class AdminProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final DocumentService documentService;
 
     public AdminProductService(
             ProductRepository productRepository,
-            CategoryRepository categoryRepository
+            CategoryRepository categoryRepository,
+            DocumentService documentService
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.documentService = documentService;
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +116,8 @@ public class AdminProductService {
 
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid category"));
+        AppDocument imageDocument = resolveImageDocument(request.imageDocumentId(), request.imageUrl());
+        String imageUrl = resolveImageUrl(imageDocument, request.imageUrl());
 
         Product product = new Product(
                 request.name().trim(),
@@ -122,7 +128,8 @@ public class AdminProductService {
                 request.defaultTaxRate(),
                 request.defaultDiscountRate(),
                 status,
-                normalizeImageUrl(request.imageUrl()),
+                imageUrl,
+                imageDocument,
                 normalizeNullable(request.imageOriginalFileName()),
                 normalizeNullable(request.imageContentType()),
                 request.imageSizeBytes(),
@@ -152,6 +159,8 @@ public class AdminProductService {
 
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid category"));
+        AppDocument imageDocument = resolveImageDocument(request.imageDocumentId(), request.imageUrl());
+        String imageUrl = resolveImageUrl(imageDocument, request.imageUrl());
 
         product.updateDetails(
                 request.name().trim(),
@@ -162,7 +171,8 @@ public class AdminProductService {
                 request.defaultTaxRate(),
                 request.defaultDiscountRate(),
                 status,
-                normalizeImageUrl(request.imageUrl()),
+                imageUrl,
+                imageDocument,
                 normalizeNullable(request.imageOriginalFileName()),
                 normalizeNullable(request.imageContentType()),
                 request.imageSizeBytes(),
@@ -177,10 +187,13 @@ public class AdminProductService {
 
     @Transactional
     public void deleteProduct(Long id) {
-        if (!productRepository.existsById(id)) {
-            throw new IllegalArgumentException("Product not found");
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        AppDocument imageDocument = product.getImageDocument();
+        productRepository.delete(product);
+        if (imageDocument != null) {
+            documentService.delete(imageDocument.getId(), true);
         }
-        productRepository.deleteById(id);
     }
 
     private AdminProductResponse mapProduct(Product product) {
@@ -194,6 +207,7 @@ public class AdminProductService {
                 product.getDefaultTaxRate() != null ? product.getDefaultTaxRate() : java.math.BigDecimal.ZERO,
                 product.getDefaultDiscountRate() != null ? product.getDefaultDiscountRate() : java.math.BigDecimal.ZERO,
                 product.getStatus() != null ? product.getStatus().name() : "ACTIVE",
+                product.getImageDocument() != null ? product.getImageDocument().getId() : null,
                 product.getImageUrl(),
                 product.getImageOriginalFileName(),
                 product.getImageContentType(),
@@ -239,6 +253,59 @@ public class AdminProductService {
             return null;
         }
         return value.trim();
+    }
+
+    private AppDocument resolveImageDocument(UUID imageDocumentId, String imageUrl) {
+        UUID resolvedId = imageDocumentId != null ? imageDocumentId : parseDocumentIdFromUrl(imageUrl);
+        if (resolvedId == null) {
+            return null;
+        }
+        AppDocument document = documentService.getById(resolvedId);
+        if (!documentService.isPublicDocument(document)) {
+            throw new IllegalArgumentException("Invalid product image document");
+        }
+        return document;
+    }
+
+    private String resolveImageUrl(AppDocument imageDocument, String imageUrl) {
+        if (imageDocument != null) {
+            return imageDocument.getPath();
+        }
+        return normalizeImageUrl(imageUrl);
+    }
+
+    private UUID parseDocumentIdFromUrl(String imageUrl) {
+        String normalizedImageUrl = normalizeImageUrl(imageUrl);
+        if (normalizedImageUrl == null) {
+            return null;
+        }
+
+        String documentId = parseDocumentIdAfterMarker(normalizedImageUrl, "/api/documents/public/products/");
+        if (documentId == null) {
+            documentId = parseDocumentIdAfterMarker(normalizedImageUrl, "/api/documents/");
+        }
+        if (documentId == null) {
+            return null;
+        }
+
+        try {
+            return UUID.fromString(documentId);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private String parseDocumentIdAfterMarker(String value, String marker) {
+        int markerIndex = value.indexOf(marker);
+        if (markerIndex < 0) {
+            return null;
+        }
+        int idStart = markerIndex + marker.length();
+        int idEnd = value.indexOf('/', idStart);
+        if (idEnd <= idStart) {
+            return null;
+        }
+        return value.substring(idStart, idEnd);
     }
 
     private String normalizeNullable(String value) {

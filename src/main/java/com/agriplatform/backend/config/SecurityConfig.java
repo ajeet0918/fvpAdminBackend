@@ -56,6 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/customer/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/cashfree/webhook").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/portal/auth/change-password").hasRole("PORTAL_USER")
                         .requestMatchers(HttpMethod.POST, "/api/portal/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/api/documents/public/**", "/api/documents/*/content").permitAll()

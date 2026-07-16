@@ -87,6 +87,9 @@ public class AppDocument {
     @Column(nullable = false, unique = true, length = 800)
     private String path;
 
+    @Column(nullable = false, length = 30)
+    private String storageProvider;
+
     @Column(length = 120)
     private String contentType;
 
@@ -126,6 +129,7 @@ public class AppDocument {
         this.originalFileName = originalFileName;
         this.objectKey = objectKey;
         this.path = path;
+        this.storageProvider = "LOCAL";
         this.contentType = contentType;
         this.sizeBytes = sizeBytes;
         this.checksumSha256 = checksumSha256;
@@ -141,6 +145,9 @@ public class AppDocument {
         this.updatedAt = now;
         if (this.status == null) {
             this.status = DocumentStatus.ACTIVE;
+        }
+        if (this.storageProvider == null || this.storageProvider.isBlank()) {
+            this.storageProvider = "LOCAL";
         }
     }
 
@@ -165,8 +172,18 @@ public class AppDocument {
         return path;
     }
 
+    public String getStorageProvider() {
+        return storageProvider;
+    }
+
     public String getContentType() {
         return contentType;
+    }
+
+    public void updateStorageProvider(String storageProvider) {
+        if (storageProvider != null && !storageProvider.isBlank()) {
+            this.storageProvider = storageProvider.trim().toUpperCase();
+        }
     }
 
     public Long getSizeBytes() {

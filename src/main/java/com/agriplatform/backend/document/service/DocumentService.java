@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -32,7 +33,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @Service
 public class DocumentService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DocumentService.class);
-    private static final String PRODUCT_IMAGE_MODULE = "PRODUCT_IMAGE";
+    public static final String PRODUCT_IMAGE_MODULE = "PRODUCT_IMAGE";
 
     private final DocumentStorageProperties storageProperties;
     private final DocumentStorageProvider storageProvider;
@@ -92,6 +93,7 @@ public class DocumentService {
                     normalizedModule,
                     request.ownerId()
             );
+            document.updateStorageProvider(storageProvider.name());
             AppDocument saved = appDocumentRepository.save(document);
             saved.updatePath(buildAccessPath(saved));
             return appDocumentRepository.save(saved);
@@ -177,9 +179,12 @@ public class DocumentService {
             throw new IllegalArgumentException("Document size exceeds allowed limit");
         }
 
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        String contentType = Objects.toString(file.getContentType(), "").toLowerCase(Locale.ROOT);
         boolean matchesImage = request.allowImageMimePrefix() && contentType.startsWith("image/");
-        boolean matchesExact = request.allowedContentTypes().contains(contentType);
+        Set<String> allowedContentTypes = request.allowedContentTypes() == null
+                ? Set.of()
+                : request.allowedContentTypes();
+        boolean matchesExact = allowedContentTypes.contains(contentType);
         if (!matchesImage && !matchesExact) {
             throw new IllegalArgumentException("Unsupported document file type");
         }
@@ -187,8 +192,12 @@ public class DocumentService {
 
     private void storeLocal(String objectKey, byte[] content) {
         Path targetPath = resolveTargetPath(objectKey);
+        Path parentDirectory = targetPath.getParent();
+        if (parentDirectory == null) {
+            throw new IllegalArgumentException("Invalid document path");
+        }
         try {
-            Files.createDirectories(targetPath.getParent());
+            Files.createDirectories(parentDirectory);
             Files.write(targetPath, content);
         } catch (IOException ex) {
             throw new IllegalArgumentException("Unable to store document");
@@ -251,7 +260,7 @@ public class DocumentService {
 
     private String buildAccessPath(AppDocument document) {
         if (isPublicDocument(document)) {
-            return "/api/documents/public/products/" + document.getId() + "/content";
+            return "/api/documents/" + document.getId() + "/content";
         }
         return "/api/admin/documents/" + document.getId() + "/content";
     }
@@ -306,13 +315,27 @@ public class DocumentService {
         }
 
         String type = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
-        if (type.contains("png")) return ".png";
-        if (type.contains("webp")) return ".webp";
-        if (type.contains("gif")) return ".gif";
-        if (type.contains("pdf")) return ".pdf";
-        if (type.contains("wordprocessingml")) return ".docx";
-        if (type.contains("msword")) return ".doc";
-        if (type.contains("jpeg") || type.contains("jpg")) return ".jpg";
+        if (type.contains("png")) {
+            return ".png";
+        }
+        if (type.contains("webp")) {
+            return ".webp";
+        }
+        if (type.contains("gif")) {
+            return ".gif";
+        }
+        if (type.contains("pdf")) {
+            return ".pdf";
+        }
+        if (type.contains("wordprocessingml")) {
+            return ".docx";
+        }
+        if (type.contains("msword")) {
+            return ".doc";
+        }
+        if (type.contains("jpeg") || type.contains("jpg")) {
+            return ".jpg";
+        }
         return ".bin";
     }
 

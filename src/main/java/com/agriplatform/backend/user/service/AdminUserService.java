@@ -58,6 +58,7 @@ import com.agriplatform.backend.user.service.*;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -93,12 +94,12 @@ public class AdminUserService {
     @Transactional(readOnly = true)
     public List<AdminUserResponse> getUsers(String search, String status, String roleCode) {
         String searchFilter = normalizeSearch(search);
-        Boolean activeFilter = parseActiveFilter(status);
+        Optional<Boolean> activeFilter = parseActiveFilter(status);
         String roleFilter = normalizeUpperNullable(roleCode);
 
         return appUserRepository.findAll().stream()
                 .filter(user -> matchesSearch(user, searchFilter))
-                .filter(user -> activeFilter == null || user.isActive() == activeFilter)
+                .filter(user -> activeFilter.isEmpty() || user.isActive() == activeFilter.get())
                 .filter(user -> roleFilter == null || (user.getRole() != null && roleFilter.equals(user.getRole().getCode())))
                 .sorted(Comparator.comparing(AppUser::getCreatedAt).reversed())
                 .map(this::mapUser)
@@ -260,16 +261,16 @@ public class AdminUserService {
         return value != null && value.toLowerCase().contains(search);
     }
 
-    private Boolean parseActiveFilter(String status) {
+    private Optional<Boolean> parseActiveFilter(String status) {
         if (status == null || status.isBlank()) {
-            return null;
+            return Optional.empty();
         }
         String normalized = status.trim().toUpperCase();
         if ("ACTIVE".equals(normalized)) {
-            return true;
+            return Optional.of(true);
         }
         if ("INACTIVE".equals(normalized)) {
-            return false;
+            return Optional.of(false);
         }
         throw new IllegalArgumentException("Invalid user status filter");
     }

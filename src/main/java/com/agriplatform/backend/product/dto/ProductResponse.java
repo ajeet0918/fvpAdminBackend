@@ -57,6 +57,7 @@ import com.agriplatform.backend.user.repository.*;
 import com.agriplatform.backend.user.service.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record ProductResponse(
         Long id,
@@ -66,6 +67,7 @@ public record ProductResponse(
         BigDecimal price,
         String priceUnit,
         String status,
+        UUID imageDocumentId,
         String imageUrl,
         String shortDescription,
         String longDescription,

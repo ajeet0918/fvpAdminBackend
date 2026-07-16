@@ -57,6 +57,7 @@ import com.agriplatform.backend.user.repository.*;
 import com.agriplatform.backend.user.service.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record AdminProductResponse(
         Long id,
@@ -68,6 +69,7 @@ public record AdminProductResponse(
         BigDecimal defaultTaxRate,
         BigDecimal defaultDiscountRate,
         String status,
+        UUID imageDocumentId,
         String imageUrl,
         String imageOriginalFileName,
         String imageContentType,

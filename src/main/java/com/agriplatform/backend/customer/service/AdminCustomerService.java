@@ -61,6 +61,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,11 +83,11 @@ public class AdminCustomerService {
     @Transactional(readOnly = true)
     public List<AdminCustomerResponse> getCustomers(String search, String status) {
         String searchFilter = normalizeSearch(search);
-        Boolean activeFilter = parseActiveFilter(status);
+        Optional<Boolean> activeFilter = parseActiveFilter(status);
 
         List<Customer> customers = customerRepository.findAll().stream()
                 .filter(customer -> matchesSearch(customer, searchFilter))
-                .filter(customer -> activeFilter == null || customer.isActive() == activeFilter)
+                .filter(customer -> activeFilter.isEmpty() || customer.isActive() == activeFilter.get())
                 .sorted(Comparator.comparing(Customer::getUpdatedAt).reversed())
                 .toList();
 
@@ -173,16 +174,16 @@ public class AdminCustomerService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private Boolean parseActiveFilter(String status) {
+    private Optional<Boolean> parseActiveFilter(String status) {
         if (status == null || status.isBlank()) {
-            return null;
+            return Optional.empty();
         }
         String normalized = status.trim().toUpperCase(Locale.ROOT);
         if ("ACTIVE".equals(normalized)) {
-            return true;
+            return Optional.of(true);
         }
         if ("INACTIVE".equals(normalized)) {
-            return false;
+            return Optional.of(false);
         }
         throw new IllegalArgumentException("Invalid customer status filter");
     }

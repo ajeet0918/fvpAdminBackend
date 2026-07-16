@@ -104,6 +104,10 @@ public class Product {
     @Column(length = 600)
     private String imageUrl;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "image_document_id")
+    private AppDocument imageDocument;
+
     @Column(length = 255)
     private String imageOriginalFileName;
 
@@ -141,6 +145,7 @@ public class Product {
             BigDecimal defaultDiscountRate,
             ProductStatus status,
             String imageUrl,
+            AppDocument imageDocument,
             String imageOriginalFileName,
             String imageContentType,
             Long imageSizeBytes,
@@ -159,6 +164,7 @@ public class Product {
         this.defaultDiscountRate = defaultDiscountRate;
         this.status = status;
         this.imageUrl = imageUrl;
+        this.imageDocument = imageDocument;
         this.imageOriginalFileName = imageOriginalFileName;
         this.imageContentType = imageContentType;
         this.imageSizeBytes = imageSizeBytes;
@@ -209,6 +215,10 @@ public class Product {
         return imageUrl;
     }
 
+    public AppDocument getImageDocument() {
+        return imageDocument;
+    }
+
     public String getImageOriginalFileName() {
         return imageOriginalFileName;
     }
@@ -251,6 +261,7 @@ public class Product {
             BigDecimal defaultDiscountRate,
             ProductStatus status,
             String imageUrl,
+            AppDocument imageDocument,
             String imageOriginalFileName,
             String imageContentType,
             Long imageSizeBytes,
@@ -269,6 +280,7 @@ public class Product {
         this.defaultDiscountRate = defaultDiscountRate;
         this.status = status;
         this.imageUrl = imageUrl;
+        this.imageDocument = imageDocument;
         this.imageOriginalFileName = imageOriginalFileName;
         this.imageContentType = imageContentType;
         this.imageSizeBytes = imageSizeBytes;

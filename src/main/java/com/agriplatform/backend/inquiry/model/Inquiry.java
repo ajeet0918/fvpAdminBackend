@@ -66,6 +66,7 @@ import jakarta.persistence.Id;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 public class Inquiry {
@@ -178,11 +179,17 @@ public class Inquiry {
     @Column(length = 500)
     private String idProofUrl;
 
+    @Column(name = "id_proof_document_id")
+    private UUID idProofDocumentId;
+
     @Column(length = 1200)
     private String idProofMetadata;
 
     @Column(length = 500)
     private String paymentScreenshotUrl;
+
+    @Column(name = "payment_screenshot_document_id")
+    private UUID paymentScreenshotDocumentId;
 
     @Column(length = 1200)
     private String paymentScreenshotMetadata;
@@ -190,11 +197,17 @@ public class Inquiry {
     @Column(length = 500)
     private String aadhaarDocumentUrl;
 
+    @Column(name = "aadhaar_document_id")
+    private UUID aadhaarDocumentId;
+
     @Column(length = 1200)
     private String aadhaarDocumentMetadata;
 
     @Column(length = 500)
     private String landProofDocumentUrl;
+
+    @Column(name = "land_proof_document_id")
+    private UUID landProofDocumentId;
 
     @Column(length = 1200)
     private String landProofDocumentMetadata;
@@ -202,11 +215,17 @@ public class Inquiry {
     @Column(length = 500)
     private String bankPassbookDocumentUrl;
 
+    @Column(name = "bank_passbook_document_id")
+    private UUID bankPassbookDocumentId;
+
     @Column(length = 1200)
     private String bankPassbookDocumentMetadata;
 
     @Column(length = 500)
     private String hubDocumentUrl;
+
+    @Column(name = "hub_document_id")
+    private UUID hubDocumentId;
 
     @Column(length = 1200)
     private String hubDocumentMetadata;
@@ -610,12 +629,20 @@ public class Inquiry {
         return idProofUrl;
     }
 
+    public UUID getIdProofDocumentId() {
+        return idProofDocumentId;
+    }
+
     public String getIdProofMetadata() {
         return idProofMetadata;
     }
 
     public String getPaymentScreenshotUrl() {
         return paymentScreenshotUrl;
+    }
+
+    public UUID getPaymentScreenshotDocumentId() {
+        return paymentScreenshotDocumentId;
     }
 
     public String getPaymentScreenshotMetadata() {
@@ -626,12 +653,20 @@ public class Inquiry {
         return aadhaarDocumentUrl;
     }
 
+    public UUID getAadhaarDocumentId() {
+        return aadhaarDocumentId;
+    }
+
     public String getAadhaarDocumentMetadata() {
         return aadhaarDocumentMetadata;
     }
 
     public String getLandProofDocumentUrl() {
         return landProofDocumentUrl;
+    }
+
+    public UUID getLandProofDocumentId() {
+        return landProofDocumentId;
     }
 
     public String getLandProofDocumentMetadata() {
@@ -642,6 +677,10 @@ public class Inquiry {
         return bankPassbookDocumentUrl;
     }
 
+    public UUID getBankPassbookDocumentId() {
+        return bankPassbookDocumentId;
+    }
+
     public String getBankPassbookDocumentMetadata() {
         return bankPassbookDocumentMetadata;
     }
@@ -650,8 +689,31 @@ public class Inquiry {
         return hubDocumentUrl;
     }
 
+    public UUID getHubDocumentId() {
+        return hubDocumentId;
+    }
+
     public String getHubDocumentMetadata() {
         return hubDocumentMetadata;
+    }
+
+    public void attachInvestorDocuments(UUID idProofDocumentId, UUID paymentScreenshotDocumentId) {
+        this.idProofDocumentId = idProofDocumentId;
+        this.paymentScreenshotDocumentId = paymentScreenshotDocumentId;
+    }
+
+    public void attachFarmerDocuments(
+            UUID aadhaarDocumentId,
+            UUID landProofDocumentId,
+            UUID bankPassbookDocumentId
+    ) {
+        this.aadhaarDocumentId = aadhaarDocumentId;
+        this.landProofDocumentId = landProofDocumentId;
+        this.bankPassbookDocumentId = bankPassbookDocumentId;
+    }
+
+    public void attachCollectionHubDocument(UUID hubDocumentId) {
+        this.hubDocumentId = hubDocumentId;
     }
 
     public boolean isTermsAccepted() {

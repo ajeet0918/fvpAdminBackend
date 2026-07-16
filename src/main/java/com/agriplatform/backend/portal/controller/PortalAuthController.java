@@ -4,10 +4,12 @@ import com.agriplatform.backend.portal.dto.PortalActivateRequest;
 import com.agriplatform.backend.portal.dto.PortalAuthResponse;
 import com.agriplatform.backend.portal.dto.PortalLoginRequest;
 import com.agriplatform.backend.portal.dto.PortalMessageResponse;
+import com.agriplatform.backend.portal.dto.PortalPasswordChangeRequest;
 import com.agriplatform.backend.portal.dto.PortalPasswordResetConfirmRequest;
 import com.agriplatform.backend.portal.dto.PortalPasswordResetRequest;
 import com.agriplatform.backend.portal.service.PortalAuthService;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,5 +44,10 @@ public class PortalAuthController {
     @PostMapping("/reset-password")
     public PortalMessageResponse resetPassword(@Valid @RequestBody PortalPasswordResetConfirmRequest request) {
         return portalAuthService.resetPassword(request.token(), request.password());
+    }
+
+    @PostMapping("/change-password")
+    public PortalMessageResponse changePassword(Authentication authentication, @Valid @RequestBody PortalPasswordChangeRequest request) {
+        return portalAuthService.changeAuthenticatedPassword(authentication.getName(), request.password());
     }
 }

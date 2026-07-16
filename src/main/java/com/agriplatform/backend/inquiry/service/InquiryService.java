@@ -63,6 +63,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -149,6 +150,10 @@ public class InquiryService {
                 request.termsAccepted(),
                 agreementId
         );
+        inquiry.attachInvestorDocuments(
+                resolveDocumentId(idProofDocument),
+                resolveDocumentId(paymentScreenshotDocument)
+        );
         return mapInquiry(inquiryRepository.save(inquiry));
     }
 
@@ -206,6 +211,11 @@ public class InquiryService {
                 buildDocumentMetadataJson(bankPassbook),
                 request.termsAccepted()
         );
+        inquiry.attachFarmerDocuments(
+                resolveDocumentId(aadhaar),
+                resolveDocumentId(landProof),
+                resolveDocumentId(bankPassbook)
+        );
 
         return mapInquiry(inquiryRepository.save(inquiry));
     }
@@ -248,6 +258,7 @@ public class InquiryService {
                 request.termsAccepted(),
                 generateHubCode()
         );
+        inquiry.attachCollectionHubDocument(resolveDocumentId(hubDoc));
 
         return mapInquiry(inquiryRepository.save(inquiry));
     }
@@ -382,16 +393,22 @@ public class InquiryService {
                 inquiry.getHubOperatingDays(),
                 inquiry.getHubCode(),
                 inquiry.getIdProofUrl(),
+                inquiry.getIdProofDocumentId(),
                 inquiry.getIdProofMetadata(),
                 inquiry.getPaymentScreenshotUrl(),
+                inquiry.getPaymentScreenshotDocumentId(),
                 inquiry.getPaymentScreenshotMetadata(),
                 inquiry.getAadhaarDocumentUrl(),
+                inquiry.getAadhaarDocumentId(),
                 inquiry.getAadhaarDocumentMetadata(),
                 inquiry.getLandProofDocumentUrl(),
+                inquiry.getLandProofDocumentId(),
                 inquiry.getLandProofDocumentMetadata(),
                 inquiry.getBankPassbookDocumentUrl(),
+                inquiry.getBankPassbookDocumentId(),
                 inquiry.getBankPassbookDocumentMetadata(),
                 inquiry.getHubDocumentUrl(),
+                inquiry.getHubDocumentId(),
                 inquiry.getHubDocumentMetadata(),
                 inquiry.isTermsAccepted(),
                 inquiry.getAgreementId(),
@@ -507,6 +524,13 @@ public class InquiryService {
                 + "\"contentType\":\"" + escapeJson(storedDocument.contentType()) + "\","
                 + "\"sizeBytes\":" + (storedDocument.sizeBytes() == null ? "null" : storedDocument.sizeBytes())
                 + "}";
+    }
+
+    private UUID resolveDocumentId(InquiryDocumentStorageService.StoredDocument storedDocument) {
+        if (storedDocument == null || storedDocument.documentId() == null || storedDocument.documentId().isBlank()) {
+            return null;
+        }
+        return UUID.fromString(storedDocument.documentId());
     }
 
     private String escapeJson(String value) {

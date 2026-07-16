@@ -294,6 +294,9 @@ public class PortalSummaryService {
             Long portalUserId = parsePortalUserId(input);
             PortalUser portalUser = portalUserRepository.findById(portalUserId)
                     .orElseThrow(() -> new IllegalArgumentException("Portal user not found"));
+            if (portalUser.isResetPassword()) {
+                throw new IllegalArgumentException("Password reset is required before using the portal");
+            }
             if (hasText(portalUser.getEmail())) {
                 return normalizeIdentifier(portalUser.getEmail());
             }

@@ -59,6 +59,7 @@ import com.agriplatform.backend.user.service.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record InquiryResponse(
         Long id,
@@ -97,16 +98,22 @@ public record InquiryResponse(
         String hubOperatingDays,
         String hubCode,
         String idProofUrl,
+        UUID idProofDocumentId,
         String idProofMetadata,
         String paymentScreenshotUrl,
+        UUID paymentScreenshotDocumentId,
         String paymentScreenshotMetadata,
         String aadhaarDocumentUrl,
+        UUID aadhaarDocumentId,
         String aadhaarDocumentMetadata,
         String landProofDocumentUrl,
+        UUID landProofDocumentId,
         String landProofDocumentMetadata,
         String bankPassbookDocumentUrl,
+        UUID bankPassbookDocumentId,
         String bankPassbookDocumentMetadata,
         String hubDocumentUrl,
+        UUID hubDocumentId,
         String hubDocumentMetadata,
         Boolean termsAccepted,
         String agreementId,
