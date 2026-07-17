@@ -63,6 +63,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findBySlug(String slug);
     List<Product> findByFeaturedTrue();
+    List<Product> findByStatusOrderByName(ProductStatus status);
+    List<Product> findByStatusAndFeaturedTrue(ProductStatus status);
+    Optional<Product> findBySlugAndStatus(String slug, ProductStatus status);
     boolean existsBySlug(String slug);
     boolean existsBySlugAndIdNot(String slug, Long id);
     boolean existsBySku(String sku);
