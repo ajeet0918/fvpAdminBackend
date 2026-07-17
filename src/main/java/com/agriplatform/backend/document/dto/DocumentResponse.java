@@ -64,7 +64,6 @@ public record DocumentResponse(
         String originalFileName,
         String objectKey,
         String path,
-        String storageProvider,
         String contentType,
         Long sizeBytes,
         String checksumSha256,
