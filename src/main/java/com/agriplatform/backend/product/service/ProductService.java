@@ -70,15 +70,21 @@ public class ProductService {
     }
 
     public List<ProductResponse> getAllProducts() {
-        return productRepository.findAll().stream().map(this::mapProduct).toList();
+        return productRepository.findByStatusOrderByName(ProductStatus.ACTIVE)
+                .stream()
+                .map(this::mapProduct)
+                .toList();
     }
 
     public List<ProductResponse> getFeaturedProducts() {
-        return productRepository.findByFeaturedTrue().stream().map(this::mapProduct).toList();
+        return productRepository.findByStatusAndFeaturedTrue(ProductStatus.ACTIVE)
+                .stream()
+                .map(this::mapProduct)
+                .toList();
     }
 
     public ProductResponse getBySlug(String slug) {
-        return productRepository.findBySlug(slug)
+        return productRepository.findBySlugAndStatus(slug, ProductStatus.ACTIVE)
                 .map(this::mapProduct)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
     }

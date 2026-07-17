@@ -69,15 +69,18 @@ public class AdminProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final OrderItemRepository orderItemRepository;
     private final DocumentService documentService;
 
     public AdminProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
+            OrderItemRepository orderItemRepository,
             DocumentService documentService
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
+        this.orderItemRepository = orderItemRepository;
         this.documentService = documentService;
     }
 
@@ -190,7 +193,9 @@ public class AdminProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found"));
         AppDocument imageDocument = product.getImageDocument();
+        orderItemRepository.clearProductReference(id);
         productRepository.delete(product);
+        productRepository.flush();
         if (imageDocument != null) {
             documentService.delete(imageDocument.getId(), true);
         }
