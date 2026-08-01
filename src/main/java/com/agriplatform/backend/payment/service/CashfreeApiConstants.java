@@ -34,15 +34,24 @@ public final class CashfreeApiConstants {
     public static final String FIELD_PAYMENT_ID = "payment_id";
 
     public static final Set<String> SUCCESS_STATUSES = Set.of("PAID", "SUCCESS");
-    public static final Set<String> FAILURE_STATUSES = Set.of("FAILED", "CANCELLED");
+    public static final Set<String> FAILURE_STATUSES = Set.of("FAILED", "CANCELLED", "USER_DROPPED");
 
-    public static final String[] ORDER_ID_PATHS = {
+    public static final String[] MERCHANT_ORDER_ID_PATHS = {
+            "data.order.order_id",
+            "order.order_id",
+            "order_id"
+    };
+
+    public static final String[] PROVIDER_ORDER_ID_PATHS = {
             "data.order.cf_order_id",
             "order.cf_order_id",
             "cf_order_id"
     };
 
-    public static final String[] ORDER_STATUS_PATHS = {
+    public static final String[] PAYMENT_STATUS_PATHS = {
+            "data.payment.payment_status",
+            "payment.payment_status",
+            "payment_status",
             "data.order.order_status",
             "order.order_status",
             "order_status"

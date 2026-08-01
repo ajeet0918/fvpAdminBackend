@@ -14,6 +14,7 @@ import com.agriplatform.backend.order.dto.QuoteOrderItemRequest;
 import com.agriplatform.backend.order.dto.QuoteOrderRequest;
 import com.agriplatform.backend.order.dto.UpdateOrderStatusRequest;
 import com.agriplatform.backend.order.model.OrderItem;
+import com.agriplatform.backend.order.model.OrderPaymentStatus;
 import com.agriplatform.backend.order.model.OrderStatusHistory;
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.model.PurchaseOrderStatus;
@@ -283,26 +284,31 @@ public class OrderService {
     }
 
     @Transactional
-    public PurchaseOrder markPaymentSuccessByProviderOrderId(String providerOrderId, String providerReference) {
-        PurchaseOrder purchaseOrder = purchaseOrderRepository.findByPaymentProviderOrderId(providerOrderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order payment reference not found"));
+    public PurchaseOrder markPaymentSuccessByGatewayOrderReference(String orderReference, String providerReference) {
+        PurchaseOrder purchaseOrder = findByGatewayOrderReference(orderReference);
+        if (purchaseOrder.getPaymentStatus() == OrderPaymentStatus.PAID) {
+            return purchaseOrder;
+        }
         purchaseOrder.markPaymentPaid(providerReference);
         purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), "Payment confirmed from gateway."));
         return purchaseOrderRepository.save(purchaseOrder);
     }
 
     @Transactional
-    public PurchaseOrder markPaymentFailedByProviderOrderId(String providerOrderId, String providerReference) {
-        PurchaseOrder purchaseOrder = purchaseOrderRepository.findByPaymentProviderOrderId(providerOrderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order payment reference not found"));
+    public PurchaseOrder markPaymentFailedByGatewayOrderReference(String orderReference, String providerReference) {
+        PurchaseOrder purchaseOrder = findByGatewayOrderReference(orderReference);
+        if (purchaseOrder.getPaymentStatus() == OrderPaymentStatus.PAID) {
+            return purchaseOrder;
+        }
         purchaseOrder.markPaymentFailed(providerReference);
         purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), "Payment failed from gateway."));
         return purchaseOrderRepository.save(purchaseOrder);
     }
 
     @Transactional(readOnly = true)
-    public PurchaseOrder findByPaymentProviderOrderId(String providerOrderId) {
-        return purchaseOrderRepository.findByPaymentProviderOrderId(providerOrderId)
+    public PurchaseOrder findByGatewayOrderReference(String orderReference) {
+        return purchaseOrderRepository.findByOrderNumber(orderReference)
+                .or(() -> purchaseOrderRepository.findByPaymentProviderOrderId(orderReference))
                 .orElseThrow(() -> new IllegalArgumentException("Order payment reference not found"));
     }
 
