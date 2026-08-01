@@ -16,17 +16,20 @@ public class CashfreeWebhookService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeWebhookService.class);
 
     private final CashfreeSettingsResolver cashfreeSettingsResolver;
+    private final CashfreeClientFactory cashfreeClientFactory;
     private final ObjectMapper objectMapper;
     private final OrderService orderService;
     private final OrderPaymentEventRepository orderPaymentEventRepository;
 
     public CashfreeWebhookService(
             CashfreeSettingsResolver cashfreeSettingsResolver,
+            CashfreeClientFactory cashfreeClientFactory,
             ObjectMapper objectMapper,
             OrderService orderService,
             OrderPaymentEventRepository orderPaymentEventRepository
     ) {
         this.cashfreeSettingsResolver = cashfreeSettingsResolver;
+        this.cashfreeClientFactory = cashfreeClientFactory;
         this.objectMapper = objectMapper;
         this.orderService = orderService;
         this.orderPaymentEventRepository = orderPaymentEventRepository;
@@ -40,6 +43,10 @@ public class CashfreeWebhookService {
         }
 
         JsonNode root = parse(payload);
+        if (isConnectivityTest(root)) {
+            log.info("Cashfree webhook connectivity test accepted");
+            return;
+        }
         String providerOrderId = firstText(root, CashfreeApiConstants.ORDER_ID_PATHS);
         String orderStatus = firstText(root, CashfreeApiConstants.ORDER_STATUS_PATHS);
         String eventType = firstText(root, CashfreeApiConstants.EVENT_TYPE_PATHS);
@@ -80,22 +87,18 @@ public class CashfreeWebhookService {
         }
 
         try {
-            Cashfree cashfree = new Cashfree(
-                    resolveEnvironment(config),
-                    config.apiVersion(),
-                    config.clientId(),
-                    config.clientSecret(),
-                    null,
-                    null
-            );
+            Cashfree cashfree = cashfreeClientFactory.create(config);
             cashfree.PGVerifyWebhookSignature(signature.trim(), payload, timestamp.trim());
         } catch (Exception ex) {
             throw new IllegalArgumentException("Invalid webhook signature", ex);
         }
     }
 
-    private Cashfree.CFEnvironment resolveEnvironment(CashfreeRuntimeConfig config) {
-        return Cashfree.CFEnvironment.PRODUCTION;
+    private boolean isConnectivityTest(JsonNode root) {
+        JsonNode testObject = find(root, "data.test_object");
+        return "WEBHOOK".equalsIgnoreCase(firstText(root, CashfreeApiConstants.FIELD_TYPE))
+                && testObject != null
+                && testObject.isObject();
     }
 
     private JsonNode parse(String payload) {

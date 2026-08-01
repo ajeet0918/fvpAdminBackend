@@ -259,10 +259,16 @@ public class OrderService {
     }
 
     @Transactional
-    public PurchaseOrder markPaymentPending(Long orderId, String provider, String providerOrderId, BigDecimal dueAmount) {
+    public PurchaseOrder markPaymentPending(
+            Long orderId,
+            String provider,
+            String providerOrderId,
+            BigDecimal dueAmount,
+            String historyNote
+    ) {
         PurchaseOrder purchaseOrder = getOrderEntity(orderId);
         purchaseOrder.markPaymentPending(provider, providerOrderId, dueAmount);
-        purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), "Payment session created."));
+        purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), historyNote));
         return purchaseOrderRepository.save(purchaseOrder);
     }
 
