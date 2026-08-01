@@ -43,7 +43,8 @@ public class CustomerOrderService {
                 orderResponse.id(),
                 CashfreeApiConstants.GATEWAY_NAME,
                 null,
-                orderResponse.totalAmount()
+                orderResponse.totalAmount(),
+                "Payment initiation requested."
         );
 
         if (!cashfreeGatewayService.isEnabled()) {
@@ -84,7 +85,8 @@ public class CustomerOrderService {
                 order.getId(),
                 CashfreeApiConstants.GATEWAY_NAME,
                 order.getPaymentProviderOrderId(),
-                order.getTotalAmount()
+                order.getTotalAmount(),
+                "Payment retry requested."
         );
 
         return tryCreateGatewaySession(
@@ -120,7 +122,8 @@ public class CustomerOrderService {
                     order.getId(),
                     CashfreeApiConstants.GATEWAY_NAME,
                     paymentResult.providerOrderId(),
-                    order.getTotalAmount()
+                    order.getTotalAmount(),
+                    "Payment session created."
             );
 
             return new OrderPaymentSessionResponse(

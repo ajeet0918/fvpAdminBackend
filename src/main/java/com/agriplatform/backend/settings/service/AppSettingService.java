@@ -88,10 +88,7 @@ public class AppSettingService {
 
     private String resolveNextValue(AppSetting existing, String requestedValue) {
         String normalizedRequested = normalizeText(requestedValue);
-        if (existing.isSecret() && !hasText(normalizedRequested)) {
-            return existing.getSettingValue();
-        }
-        if (SECRET_MASK.equals(normalizedRequested)) {
+        if (existing.isSecret() && (!hasText(normalizedRequested) || isSecretMask(normalizedRequested))) {
             return existing.getSettingValue();
         }
         return normalizedRequested;
@@ -120,6 +117,10 @@ public class AppSettingService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private boolean isSecretMask(String value) {
+        return value.chars().allMatch(character -> character == '*');
     }
 }
 

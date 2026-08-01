@@ -20,9 +20,14 @@ public class CashfreeGatewayService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CashfreeGatewayService.class);
 
     private final CashfreeSettingsResolver cashfreeSettingsResolver;
+    private final CashfreeClientFactory cashfreeClientFactory;
 
-    public CashfreeGatewayService(CashfreeSettingsResolver cashfreeSettingsResolver) {
+    public CashfreeGatewayService(
+            CashfreeSettingsResolver cashfreeSettingsResolver,
+            CashfreeClientFactory cashfreeClientFactory
+    ) {
         this.cashfreeSettingsResolver = cashfreeSettingsResolver;
+        this.cashfreeClientFactory = cashfreeClientFactory;
     }
 
     public boolean isEnabled() {
@@ -43,14 +48,7 @@ public class CashfreeGatewayService {
         }
 
         try {
-            Cashfree cashfree = new Cashfree(
-                    resolveEnvironment(config),
-                    config.apiVersion(),
-                    config.clientId(),
-                    config.clientSecret(),
-                    null,
-                    null
-            );
+            Cashfree cashfree = cashfreeClientFactory.create(config);
 
             CreateOrderRequest request = new CreateOrderRequest()
                     .orderId(order.getOrderNumber())
@@ -61,7 +59,7 @@ public class CashfreeGatewayService {
 
             ApiResponse<OrderEntity> response = cashfree.PGCreateOrder(
                     request,
-                    config.apiVersion(),
+                    UUID.randomUUID().toString(),
                     UUID.randomUUID(),
                     null
             );
@@ -98,10 +96,6 @@ public class CashfreeGatewayService {
 
         return new OrderMeta()
                 .returnUrl(returnUrl);
-    }
-
-    private Cashfree.CFEnvironment resolveEnvironment(CashfreeRuntimeConfig config) {
-        return Cashfree.CFEnvironment.PRODUCTION;
     }
 
     private String buildQueryDelimiter(String url) {
