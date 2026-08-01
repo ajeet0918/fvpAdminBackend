@@ -59,6 +59,8 @@ import com.agriplatform.backend.user.service.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.agriplatform.backend.payment.dto.OrderRefundResponse;
+import com.agriplatform.backend.payment.dto.OrderRefundSummaryResponse;
 
 public record OrderResponse(
         Long id,
@@ -81,6 +83,8 @@ public record OrderResponse(
         String paymentProviderOrderId,
         String paymentProviderReference,
         LocalDateTime paidAt,
+        OrderRefundSummaryResponse refundSummary,
+        List<OrderRefundResponse> refunds,
         LocalDateTime createdAt,
         LocalDateTime quotedAt,
         LocalDateTime confirmedAt,

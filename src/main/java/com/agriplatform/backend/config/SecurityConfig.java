@@ -75,6 +75,8 @@ public class SecurityConfig {
                                 "/api/admin/owners"
                         ).hasAnyRole("ADMIN", "SYSADMIN", "SALES")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SYSADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/refunds", "/api/orders/*/refunds/**")
+                        .hasAnyRole("ADMIN", "SYSADMIN")
                         .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "SYSADMIN", "SALES")
                         .anyRequest().authenticated()
                 )

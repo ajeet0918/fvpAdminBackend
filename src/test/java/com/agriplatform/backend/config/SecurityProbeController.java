@@ -2,6 +2,7 @@ package com.agriplatform.backend.config;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
 class SecurityProbeController {
@@ -18,5 +19,10 @@ class SecurityProbeController {
     @GetMapping("/api/customer/me/security-probe")
     String customerAccount() {
         return "customer-account";
+    }
+
+    @PostMapping("/api/orders/1/refunds")
+    String createRefund() {
+        return "refund-created";
     }
 }

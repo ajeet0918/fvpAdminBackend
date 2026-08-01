@@ -12,6 +12,7 @@ import com.agriplatform.backend.order.model.OrderPaymentStatus;
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.repository.PurchaseOrderRepository;
 import com.agriplatform.backend.product.repository.ProductRepository;
+import com.agriplatform.backend.payment.service.OrderRefundService;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +29,8 @@ class OrderServicePaymentTest {
                 purchaseOrderRepository,
                 mock(ProductRepository.class),
                 mock(CustomerRepository.class),
-                mock(CustomerAddressRepository.class)
+                mock(CustomerAddressRepository.class),
+                mock(OrderRefundService.class)
         );
     }
 
@@ -72,6 +74,24 @@ class OrderServicePaymentTest {
         PurchaseOrder updated = orderService.markPaymentFailedByGatewayOrderReference(
                 "FVP-ORDER-3",
                 "1453002798"
+        );
+
+        assertThat(updated.getPaymentStatus()).isEqualTo(OrderPaymentStatus.PAID);
+        verify(purchaseOrderRepository, never()).save(order);
+    }
+
+    @Test
+    void markPaymentPendingDoesNotDowngradePaidOrder() {
+        PurchaseOrder order = order("FVP-ORDER-4");
+        order.markPaymentPaid("1453002799");
+        when(purchaseOrderRepository.findById(4L)).thenReturn(Optional.of(order));
+
+        PurchaseOrder updated = orderService.markPaymentPending(
+                4L,
+                "CASHFREE",
+                "2149460582",
+                new BigDecimal("100.00"),
+                "Payment retry requested."
         );
 
         assertThat(updated.getPaymentStatus()).isEqualTo(OrderPaymentStatus.PAID);

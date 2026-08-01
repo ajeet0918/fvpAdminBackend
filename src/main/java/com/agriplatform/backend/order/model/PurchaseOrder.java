@@ -44,6 +44,7 @@ import com.agriplatform.backend.portal.dto.*;
 import com.agriplatform.backend.portal.model.*;
 import com.agriplatform.backend.portal.repository.*;
 import com.agriplatform.backend.portal.service.*;
+import com.agriplatform.backend.payment.model.OrderRefund;
 import com.agriplatform.backend.product.controller.*;
 import com.agriplatform.backend.product.dto.*;
 import com.agriplatform.backend.product.model.*;
@@ -183,6 +184,9 @@ public class PurchaseOrder {
 
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderStatusHistory> statusHistory = new ArrayList<>();
+
+    @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderRefund> refunds = new ArrayList<>();
 
     public PurchaseOrder() {
     }
@@ -453,5 +457,13 @@ public class PurchaseOrder {
     public void markPaymentFailed(String providerReference) {
         this.paymentProviderReference = providerReference;
         this.paymentStatus = OrderPaymentStatus.FAILED;
+    }
+
+    public List<OrderRefund> getRefunds() {
+        return refunds;
+    }
+
+    public void addRefund(OrderRefund refund) {
+        refunds.add(refund);
     }
 }
