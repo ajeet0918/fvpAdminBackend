@@ -21,7 +21,12 @@ public final class CashfreeApiConstants {
     public static final String DEFAULT_API_VERSION = "2023-08-01";
     public static final String CURRENCY_INR = "INR";
     public static final String GATEWAY_NAME = "CASHFREE";
+    public static final String ORDER_STATUS_ACTIVE = "ACTIVE";
+    public static final String ORDER_STATUS_PAID = "PAID";
+    public static final int HTTP_STATUS_NOT_FOUND = 404;
     public static final String DEFAULT_EVENT_TYPE = "cashfree.webhook";
+    public static final String REFUND_STATUS_WEBHOOK = "REFUND_STATUS_WEBHOOK";
+    public static final String AUTO_REFUND_STATUS_WEBHOOK = "AUTO_REFUND_STATUS_WEBHOOK";
 
     public static final String FIELD_CF_ORDER_ID = "cf_order_id";
     public static final String FIELD_PAYMENT_SESSION_ID = "payment_session_id";
@@ -69,4 +74,9 @@ public final class CashfreeApiConstants {
             "data.payment.payment_id",
             "payment.payment_id"
     };
+
+    public static final Set<String> REFUND_EVENT_TYPES = Set.of(
+            REFUND_STATUS_WEBHOOK,
+            AUTO_REFUND_STATUS_WEBHOOK
+    );
 }

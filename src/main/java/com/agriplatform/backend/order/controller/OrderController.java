@@ -67,6 +67,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import com.agriplatform.backend.payment.dto.CreateOrderRefundRequest;
+import com.agriplatform.backend.payment.dto.OrderRefundResponse;
+import com.agriplatform.backend.payment.service.OrderRefundService;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -74,9 +78,11 @@ public class OrderController {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrderController.class);
 
     private final OrderService orderService;
+    private final OrderRefundService orderRefundService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, OrderRefundService orderRefundService) {
         this.orderService = orderService;
+        this.orderRefundService = orderRefundService;
     }
 
     @PostMapping
@@ -108,5 +114,19 @@ public class OrderController {
     @PatchMapping("/{id}/status")
     public OrderResponse updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateOrderStatusRequest request) {
         return orderService.updateStatus(id, request);
+    }
+
+    @PostMapping("/{id}/refunds")
+    public OrderRefundResponse createRefund(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateOrderRefundRequest request,
+            Authentication authentication
+    ) {
+        return orderRefundService.createRefund(id, request, authentication.getName());
+    }
+
+    @PostMapping("/{id}/refunds/sync")
+    public List<OrderRefundResponse> syncRefunds(@PathVariable Long id) {
+        return orderRefundService.syncRefunds(id);
     }
 }

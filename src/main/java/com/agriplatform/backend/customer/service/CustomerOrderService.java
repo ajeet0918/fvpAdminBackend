@@ -10,9 +10,11 @@ import com.agriplatform.backend.order.model.OrderPaymentStatus;
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.service.OrderService;
 import com.agriplatform.backend.payment.dto.CashfreeCreateOrderResult;
+import com.agriplatform.backend.payment.dto.CashfreeOrderStatusResult;
 import com.agriplatform.backend.payment.service.CashfreeApiConstants;
 import com.agriplatform.backend.payment.service.CashfreeGatewayService;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -80,22 +82,7 @@ public class CustomerOrderService {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
 
-        // Keep order in pending state and retry gateway session creation.
-        orderService.markPaymentPending(
-                order.getId(),
-                CashfreeApiConstants.GATEWAY_NAME,
-                order.getPaymentProviderOrderId(),
-                order.getTotalAmount(),
-                "Payment retry requested."
-        );
-
-        return tryCreateGatewaySession(
-                orderService.getOrderEntityForOperations(orderId),
-                customer,
-                request.checkoutSuccessUrl(),
-                request.checkoutFailureUrl(),
-                "Unable to create payment session right now. Please retry after some time."
-        );
+        return resolveRetryPaymentSession(order, customer, request);
     }
 
     public List<OrderResponse> getOrderHistory(Long customerId) {
@@ -151,6 +138,115 @@ public class CustomerOrderService {
                     failureMessage
             );
         }
+    }
+
+    private OrderPaymentSessionResponse resolveRetryPaymentSession(
+            PurchaseOrder order,
+            Customer customer,
+            CreateOrderPaymentSessionRequest request
+    ) {
+        Optional<CashfreeOrderStatusResult> gatewayOrder;
+        try {
+            gatewayOrder = cashfreeGatewayService.findOrder(order);
+        } catch (RuntimeException ex) {
+            return paymentSessionFailure(order, ex);
+        }
+
+        if (gatewayOrder.isPresent()) {
+            return handleExistingGatewayOrder(order, gatewayOrder.get());
+        }
+
+        PurchaseOrder pendingOrder = orderService.markPaymentPending(
+                order.getId(),
+                CashfreeApiConstants.GATEWAY_NAME,
+                null,
+                order.getTotalAmount(),
+                "Payment retry requested; no existing Cashfree order was found."
+        );
+        return tryCreateGatewaySession(
+                pendingOrder,
+                customer,
+                request.checkoutSuccessUrl(),
+                request.checkoutFailureUrl(),
+                "Unable to create payment session right now. Please retry after some time."
+        );
+    }
+
+    private OrderPaymentSessionResponse handleExistingGatewayOrder(
+            PurchaseOrder order,
+            CashfreeOrderStatusResult gatewayOrder
+    ) {
+        if (CashfreeApiConstants.ORDER_STATUS_PAID.equalsIgnoreCase(gatewayOrder.orderStatus())) {
+            PurchaseOrder paidOrder = orderService.markPaymentSuccessByGatewayOrderReference(
+                    order.getOrderNumber(),
+                    gatewayOrder.paymentReference()
+            );
+            return paymentSessionResponse(paidOrder, gatewayOrder, "", "Payment is already confirmed.");
+        }
+        if (CashfreeApiConstants.ORDER_STATUS_ACTIVE.equalsIgnoreCase(gatewayOrder.orderStatus())
+                && hasText(gatewayOrder.paymentSessionId())) {
+            PurchaseOrder pendingOrder = orderService.markPaymentPending(
+                    order.getId(),
+                    CashfreeApiConstants.GATEWAY_NAME,
+                    gatewayOrder.providerOrderId(),
+                    order.getTotalAmount(),
+                    "Existing Cashfree payment session reused."
+            );
+            if (pendingOrder.getPaymentStatus() == OrderPaymentStatus.PAID) {
+                return paymentSessionResponse(pendingOrder, gatewayOrder, "", "Payment is already confirmed.");
+            }
+            return paymentSessionResponse(
+                    pendingOrder,
+                    gatewayOrder,
+                    gatewayOrder.paymentSessionId(),
+                    "Existing payment session resumed."
+            );
+        }
+
+        orderService.addPaymentStatusHistory(order.getId(), "Cashfree payment session is no longer payable.");
+        return paymentSessionResponse(
+                order,
+                gatewayOrder,
+                "",
+                "The previous payment session has expired. Contact support."
+        );
+    }
+
+    private OrderPaymentSessionResponse paymentSessionFailure(PurchaseOrder order, RuntimeException ex) {
+        orderService.addPaymentStatusHistory(
+                order.getId(),
+                "Payment status reconciliation failed: " + safeMessage(ex)
+        );
+        return new OrderPaymentSessionResponse(
+                order.getId(),
+                order.getOrderNumber(),
+                CashfreeApiConstants.GATEWAY_NAME,
+                order.getPaymentProviderOrderId(),
+                "",
+                "",
+                "Unable to verify the previous payment right now. Please retry after some time."
+        );
+    }
+
+    private OrderPaymentSessionResponse paymentSessionResponse(
+            PurchaseOrder order,
+            CashfreeOrderStatusResult gatewayOrder,
+            String paymentSessionId,
+            String message
+    ) {
+        return new OrderPaymentSessionResponse(
+                order.getId(),
+                order.getOrderNumber(),
+                CashfreeApiConstants.GATEWAY_NAME,
+                gatewayOrder.providerOrderId(),
+                paymentSessionId,
+                "",
+                message
+        );
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String safeMessage(RuntimeException ex) {

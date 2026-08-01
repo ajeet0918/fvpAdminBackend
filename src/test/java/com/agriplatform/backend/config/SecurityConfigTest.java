@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -61,6 +62,19 @@ class SecurityConfigTest {
         mockMvc.perform(get("/api/admin/products/security-probe").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(content().string("admin-products"));
+    }
+
+    @Test
+    void refundEndpointRejectsSalesRole() throws Exception {
+        mockMvc.perform(post("/api/orders/1/refunds").with(user("sales").roles("SALES")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void refundEndpointAllowsAdminRole() throws Exception {
+        mockMvc.perform(post("/api/orders/1/refunds").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string("refund-created"));
     }
 
     @Test

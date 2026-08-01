@@ -11,6 +11,7 @@ import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.service.OrderService;
 import com.agriplatform.backend.payment.config.CashfreeRuntimeConfig;
 import com.agriplatform.backend.payment.repository.OrderPaymentEventRepository;
+import com.agriplatform.backend.payment.model.OrderRefundStatus;
 import com.cashfree.pg.Cashfree;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,26 @@ class CashfreeWebhookServiceTest {
               "type": "PAYMENT_SUCCESS_WEBHOOK"
             }
             """;
+    private static final String REFUND_PAYLOAD = """
+            {
+              "data": {
+                "refund": {
+                  "cf_refund_id": 11325632,
+                  "cf_payment_id": 789727431,
+                  "refund_id": "REF-ORDER-1",
+                  "order_id": "FVP-ORDER-1",
+                  "refund_amount": 40.00,
+                  "refund_currency": "INR",
+                  "refund_status": "SUCCESS",
+                  "refund_note": "Cancelled before dispatch",
+                  "processed_speed": "STANDARD",
+                  "processed_at": "2026-08-01T12:00:00+05:30"
+                }
+              },
+              "event_time": "2026-08-01T12:00:01+05:30",
+              "type": "REFUND_STATUS_WEBHOOK"
+            }
+            """;
 
     @Mock
     private CashfreeSettingsResolver cashfreeSettingsResolver;
@@ -53,6 +74,9 @@ class CashfreeWebhookServiceTest {
     @Mock
     private OrderPaymentEventRepository orderPaymentEventRepository;
 
+    @Mock
+    private OrderRefundService orderRefundService;
+
     @Test
     void processWebhookAcceptsSignedConnectivityTestWithoutUpdatingOrders() throws Exception {
         CashfreeRuntimeConfig config = runtimeConfig();
@@ -63,7 +87,8 @@ class CashfreeWebhookServiceTest {
                 cashfreeClientFactory,
                 new ObjectMapper(),
                 orderService,
-                orderPaymentEventRepository
+                orderPaymentEventRepository,
+                orderRefundService
         );
 
         service.processWebhook("signature", "timestamp", TEST_PAYLOAD);
@@ -86,13 +111,39 @@ class CashfreeWebhookServiceTest {
                 cashfreeClientFactory,
                 new ObjectMapper(),
                 orderService,
-                orderPaymentEventRepository
+                orderPaymentEventRepository,
+                orderRefundService
         );
 
         service.processWebhook("signature", "timestamp", SUCCESS_PAYLOAD);
 
         verify(orderService).markPaymentSuccessByGatewayOrderReference("FVP-ORDER-1", "1453002795");
         verify(orderPaymentEventRepository).save(any());
+    }
+
+    @Test
+    void processWebhookReconcilesCashfreeRefundPayload() throws Exception {
+        CashfreeRuntimeConfig config = runtimeConfig();
+        when(cashfreeSettingsResolver.resolve()).thenReturn(config);
+        when(cashfreeClientFactory.create(config)).thenReturn(cashfree);
+        CashfreeWebhookService service = new CashfreeWebhookService(
+                cashfreeSettingsResolver,
+                cashfreeClientFactory,
+                new ObjectMapper(),
+                orderService,
+                orderPaymentEventRepository,
+                orderRefundService
+        );
+
+        service.processWebhook("signature", "timestamp", REFUND_PAYLOAD);
+
+        verify(orderRefundService).reconcileWebhook(org.mockito.ArgumentMatchers.argThat(update ->
+                update.orderNumber().equals("FVP-ORDER-1")
+                        && update.refundId().equals("REF-ORDER-1")
+                        && update.status() == OrderRefundStatus.SUCCESS
+                        && update.amount().compareTo(new java.math.BigDecimal("40.00")) == 0
+        ));
+        verifyNoInteractions(orderService);
     }
 
     private CashfreeRuntimeConfig runtimeConfig() {

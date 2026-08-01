@@ -21,6 +21,7 @@ import com.agriplatform.backend.order.model.PurchaseOrderStatus;
 import com.agriplatform.backend.order.repository.PurchaseOrderRepository;
 import com.agriplatform.backend.product.model.Product;
 import com.agriplatform.backend.product.repository.ProductRepository;
+import com.agriplatform.backend.payment.service.OrderRefundService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -42,17 +43,20 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
     private final CustomerAddressRepository customerAddressRepository;
+    private final OrderRefundService orderRefundService;
 
     public OrderService(
             PurchaseOrderRepository purchaseOrderRepository,
             ProductRepository productRepository,
             CustomerRepository customerRepository,
-            CustomerAddressRepository customerAddressRepository
+            CustomerAddressRepository customerAddressRepository,
+            OrderRefundService orderRefundService
     ) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.productRepository = productRepository;
         this.customerRepository = customerRepository;
         this.customerAddressRepository = customerAddressRepository;
+        this.orderRefundService = orderRefundService;
     }
 
     @Transactional
@@ -268,6 +272,9 @@ public class OrderService {
             String historyNote
     ) {
         PurchaseOrder purchaseOrder = getOrderEntity(orderId);
+        if (purchaseOrder.getPaymentStatus() == OrderPaymentStatus.PAID) {
+            return purchaseOrder;
+        }
         purchaseOrder.markPaymentPending(provider, providerOrderId, dueAmount);
         purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), historyNote));
         return purchaseOrderRepository.save(purchaseOrder);
@@ -520,6 +527,8 @@ public class OrderService {
                 purchaseOrder.getPaymentProviderOrderId(),
                 purchaseOrder.getPaymentProviderReference(),
                 purchaseOrder.getPaidAt(),
+                orderRefundService.summarize(purchaseOrder),
+                orderRefundService.toResponses(purchaseOrder),
                 purchaseOrder.getCreatedAt(),
                 purchaseOrder.getQuotedAt(),
                 purchaseOrder.getConfirmedAt(),
