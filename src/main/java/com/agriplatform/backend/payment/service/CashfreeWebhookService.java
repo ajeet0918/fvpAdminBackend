@@ -47,30 +47,32 @@ public class CashfreeWebhookService {
             log.info("Cashfree webhook connectivity test accepted");
             return;
         }
-        String providerOrderId = firstText(root, CashfreeApiConstants.ORDER_ID_PATHS);
-        String orderStatus = firstText(root, CashfreeApiConstants.ORDER_STATUS_PATHS);
+        String merchantOrderId = firstText(root, CashfreeApiConstants.MERCHANT_ORDER_ID_PATHS);
+        String providerOrderId = firstText(root, CashfreeApiConstants.PROVIDER_ORDER_ID_PATHS);
+        String orderReference = hasText(merchantOrderId) ? merchantOrderId : providerOrderId;
+        String paymentStatus = firstText(root, CashfreeApiConstants.PAYMENT_STATUS_PATHS);
         String eventType = firstText(root, CashfreeApiConstants.EVENT_TYPE_PATHS);
         String paymentReference = firstText(root, CashfreeApiConstants.PAYMENT_REFERENCE_PATHS);
 
-        if (providerOrderId.isBlank()) {
+        if (orderReference.isBlank()) {
             throw new IllegalArgumentException("Missing Cashfree order reference");
         }
 
         PurchaseOrder order;
-        if (matches(orderStatus, CashfreeApiConstants.SUCCESS_STATUSES)) {
-            order = orderService.markPaymentSuccessByProviderOrderId(providerOrderId, paymentReference);
-        } else if (matches(orderStatus, CashfreeApiConstants.FAILURE_STATUSES)) {
-            order = orderService.markPaymentFailedByProviderOrderId(providerOrderId, paymentReference);
+        if (matches(paymentStatus, CashfreeApiConstants.SUCCESS_STATUSES)) {
+            order = orderService.markPaymentSuccessByGatewayOrderReference(orderReference, paymentReference);
+        } else if (matches(paymentStatus, CashfreeApiConstants.FAILURE_STATUSES)) {
+            order = orderService.markPaymentFailedByGatewayOrderReference(orderReference, paymentReference);
         } else {
-            order = orderService.findByPaymentProviderOrderId(providerOrderId);
+            order = orderService.findByGatewayOrderReference(orderReference);
         }
 
         orderPaymentEventRepository.save(new OrderPaymentEvent(
                 order,
                 eventType.isBlank() ? CashfreeApiConstants.DEFAULT_EVENT_TYPE : eventType,
-                providerOrderId,
+                hasText(providerOrderId) ? providerOrderId : orderReference,
                 paymentReference,
-                orderStatus,
+                paymentStatus,
                 truncate(payload, 2000)
         ));
     }
