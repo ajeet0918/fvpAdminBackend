@@ -147,7 +147,8 @@ public class CustomerAccountService {
                 customer.getState(),
                 customer.getPostalCode(),
                 customer.getPreferredPaymentMethod(),
-                customer.getPreferredPaymentHandle()
+                customer.getPreferredPaymentHandle(),
+                customer.isDeferredPaymentEligible()
         );
     }
 

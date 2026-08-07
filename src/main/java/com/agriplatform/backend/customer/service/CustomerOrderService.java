@@ -6,7 +6,10 @@ import com.agriplatform.backend.order.dto.CreateOrderPaymentSessionRequest;
 import com.agriplatform.backend.order.dto.CreateCustomerOrderRequest;
 import com.agriplatform.backend.order.dto.OrderPaymentSessionResponse;
 import com.agriplatform.backend.order.dto.OrderResponse;
+import com.agriplatform.backend.order.dto.CustomerCancellationRequest;
 import com.agriplatform.backend.order.model.OrderPaymentStatus;
+import com.agriplatform.backend.order.model.OrderPaymentMethod;
+import com.agriplatform.backend.order.model.PurchaseOrderStatus;
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.service.OrderService;
 import com.agriplatform.backend.payment.dto.CashfreeCreateOrderResult;
@@ -39,6 +42,14 @@ public class CustomerOrderService {
         OrderResponse orderResponse = orderService.createOrderForCustomer(customerId, request);
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+
+        if (request.paymentMethod() != OrderPaymentMethod.ONLINE) {
+            PurchaseOrder deferredPaymentOrder = orderService.getOrderEntityForOperations(orderResponse.id());
+            String message = request.paymentMethod() == OrderPaymentMethod.CASH_ON_DELIVERY
+                    ? "Order created. Payment is due on delivery."
+                    : "Order created. Online payment will be available after delivery.";
+            return paymentResponse(deferredPaymentOrder, message);
+        }
 
         // Persist payment intent first so order lifecycle is not lost if gateway is unavailable.
         PurchaseOrder pendingOrder = orderService.markPaymentPending(
@@ -79,6 +90,14 @@ public class CustomerOrderService {
             throw new IllegalArgumentException("Payment already completed for this order");
         }
 
+        if (order.getPaymentMethod() == OrderPaymentMethod.CASH_ON_DELIVERY
+                || order.getPaymentMethod() == OrderPaymentMethod.PAY_AFTER_DELIVERY_ONLINE) {
+            if (order.getStatus() != PurchaseOrderStatus.DELIVERED) {
+                throw new IllegalArgumentException("Online payment after delivery is available once the order is delivered");
+            }
+            order.prepareOnlinePaymentAfterDelivery();
+        }
+
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
 
@@ -87,6 +106,10 @@ public class CustomerOrderService {
 
     public List<OrderResponse> getOrderHistory(Long customerId) {
         return orderService.getOrdersForCustomer(customerId);
+    }
+
+    public OrderResponse requestCancellation(Long customerId, Long orderId, CustomerCancellationRequest request) {
+        return orderService.requestCancellation(customerId, orderId, request);
     }
 
     private OrderPaymentSessionResponse tryCreateGatewaySession(
@@ -240,6 +263,18 @@ public class CustomerOrderService {
                 CashfreeApiConstants.GATEWAY_NAME,
                 gatewayOrder.providerOrderId(),
                 paymentSessionId,
+                "",
+                message
+        );
+    }
+
+    private OrderPaymentSessionResponse paymentResponse(PurchaseOrder order, String message) {
+        return new OrderPaymentSessionResponse(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getPaymentProvider(),
+                order.getPaymentProviderOrderId(),
+                "",
                 "",
                 message
         );

@@ -41,6 +41,10 @@ public class OrderRefund {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
+    private OrderRefundMethod refundMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
     private OrderRefundStatus status;
 
     @Column(nullable = false, length = 20)
@@ -74,6 +78,7 @@ public class OrderRefund {
             String refundId,
             BigDecimal amount,
             String currency,
+            OrderRefundMethod refundMethod,
             String speed,
             String note,
             String requestedBy
@@ -82,12 +87,25 @@ public class OrderRefund {
         this.refundId = refundId;
         this.amount = amount;
         this.currency = currency;
+        this.refundMethod = refundMethod;
         this.speed = speed;
         this.note = note;
         this.requestedBy = requestedBy;
         this.status = OrderRefundStatus.PENDING;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
+    }
+
+    public OrderRefund(
+            PurchaseOrder purchaseOrder,
+            String refundId,
+            BigDecimal amount,
+            String currency,
+            String speed,
+            String note,
+            String requestedBy
+    ) {
+        this(purchaseOrder, refundId, amount, currency, OrderRefundMethod.CASHFREE, speed, note, requestedBy);
     }
 
     public boolean applyGatewayStatus(
@@ -135,6 +153,10 @@ public class OrderRefund {
 
     public String getCurrency() {
         return currency;
+    }
+
+    public OrderRefundMethod getRefundMethod() {
+        return refundMethod;
     }
 
     public OrderRefundStatus getStatus() {

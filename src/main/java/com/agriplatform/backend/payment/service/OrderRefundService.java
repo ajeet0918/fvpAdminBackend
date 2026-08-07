@@ -7,11 +7,13 @@ import com.agriplatform.backend.order.repository.PurchaseOrderRepository;
 import com.agriplatform.backend.payment.dto.CashfreeRefundResult;
 import com.agriplatform.backend.payment.dto.CashfreeRefundSnapshot;
 import com.agriplatform.backend.payment.dto.CreateOrderRefundRequest;
+import com.agriplatform.backend.payment.dto.CompleteManualRefundRequest;
 import com.agriplatform.backend.payment.dto.OrderRefundResponse;
 import com.agriplatform.backend.payment.dto.OrderRefundSummaryResponse;
 import com.agriplatform.backend.payment.dto.RefundWebhookUpdate;
 import com.agriplatform.backend.payment.model.OrderRefund;
 import com.agriplatform.backend.payment.model.OrderRefundStatus;
+import com.agriplatform.backend.payment.model.OrderRefundMethod;
 import com.agriplatform.backend.payment.repository.OrderRefundRepository;
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -50,6 +52,7 @@ public class OrderRefundService {
         validateRefundRequest(order, request.amount());
 
         String refundId = buildRefundId(order.getId());
+        OrderRefundMethod refundMethod = resolveRefundMethod(order, request.refundMethod());
         String speed = normalizeSpeed(request.speed());
         String note = normalizeNote(request.note());
         OrderRefund refund = new OrderRefund(
@@ -57,6 +60,7 @@ public class OrderRefundService {
                 refundId,
                 request.amount(),
                 order.getCurrency(),
+                refundMethod,
                 speed,
                 note,
                 requestedBy
@@ -64,7 +68,39 @@ public class OrderRefundService {
         order.addRefund(refund);
         purchaseOrderRepository.saveAndFlush(order);
 
-        applyGatewayResult(refund, order, request.amount(), refundId, note, speed);
+        if (refundMethod == OrderRefundMethod.CASHFREE) {
+            applyGatewayResult(refund, order, request.amount(), refundId, note, speed);
+        } else {
+            addRefundHistory(order, refund);
+        }
+        return toResponse(orderRefundRepository.save(refund));
+    }
+
+    @Transactional
+    public OrderRefundResponse completeManualRefund(
+            Long orderId,
+            Long refundId,
+            CompleteManualRefundRequest request,
+            String processedBy
+    ) {
+        PurchaseOrder order = purchaseOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+        OrderRefund refund = order.getRefunds().stream()
+                .filter(candidate -> candidate.getId() != null && candidate.getId().equals(refundId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Refund not found"));
+        if (refund.getRefundMethod() != OrderRefundMethod.BANK_TRANSFER) {
+            throw new IllegalArgumentException("Only bank transfer refunds can be completed manually");
+        }
+        if (refund.getStatus() != OrderRefundStatus.PENDING && refund.getStatus() != OrderRefundStatus.ONHOLD) {
+            throw new IllegalArgumentException("Refund is not awaiting manual completion");
+        }
+        String reference = request.reference().trim();
+        String note = request.note() == null || request.note().isBlank()
+                ? "Manual bank transfer refund completed by " + processedBy + ": " + reference
+                : request.note().trim();
+        refund.applyGatewayStatus(reference, null, OrderRefundStatus.SUCCESS, note, null, java.time.LocalDateTime.now());
+        addRefundHistory(order, refund);
         return toResponse(orderRefundRepository.save(refund));
     }
 
@@ -154,13 +190,22 @@ public class OrderRefundService {
         if (order.getPaymentStatus() != OrderPaymentStatus.PAID) {
             throw new IllegalArgumentException("Only paid orders can be refunded");
         }
-        if (!CashfreeApiConstants.GATEWAY_NAME.equalsIgnoreCase(order.getPaymentProvider())) {
-            throw new IllegalArgumentException("Only Cashfree payments can be refunded from this application");
-        }
         BigDecimal refundableAmount = summarize(order).refundableAmount();
         if (amount.compareTo(refundableAmount) > 0) {
             throw new IllegalArgumentException("Refund amount exceeds the remaining refundable amount");
         }
+    }
+
+    private OrderRefundMethod resolveRefundMethod(PurchaseOrder order, OrderRefundMethod requested) {
+        OrderRefundMethod method = requested == null ? OrderRefundMethod.CASHFREE : requested;
+        boolean cashfreePayment = CashfreeApiConstants.GATEWAY_NAME.equalsIgnoreCase(order.getPaymentProvider());
+        if (method == OrderRefundMethod.CASHFREE && !cashfreePayment) {
+            throw new IllegalArgumentException("Offline payments must be refunded by bank transfer");
+        }
+        if (method == OrderRefundMethod.BANK_TRANSFER && cashfreePayment) {
+            throw new IllegalArgumentException("Cashfree payments must be refunded through Cashfree");
+        }
+        return method;
     }
 
     private void applyGatewayResult(
@@ -197,6 +242,7 @@ public class OrderRefundService {
                 update.refundId(),
                 update.amount(),
                 hasText(update.currency()) ? update.currency() : order.getCurrency(),
+                OrderRefundMethod.CASHFREE,
                 hasText(update.speed()) ? update.speed() : DEFAULT_REFUND_SPEED,
                 truncate(hasText(update.note()) ? update.note() : DEFAULT_REFUND_NOTE, 100),
                 WEBHOOK_ACTOR
@@ -290,6 +336,7 @@ public class OrderRefundService {
                 refund.getProviderPaymentId(),
                 refund.getAmount(),
                 refund.getCurrency(),
+                refund.getRefundMethod(),
                 refund.getStatus(),
                 refund.getSpeed(),
                 refund.getNote(),

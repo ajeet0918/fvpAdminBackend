@@ -61,6 +61,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import com.agriplatform.backend.payment.dto.OrderRefundResponse;
 import com.agriplatform.backend.payment.dto.OrderRefundSummaryResponse;
+import com.agriplatform.backend.order.model.OrderPaymentMethod;
+import com.agriplatform.backend.order.model.OrderCancellationStatus;
 
 public record OrderResponse(
         Long id,
@@ -77,12 +79,20 @@ public record OrderResponse(
         String customerNotes,
         PurchaseOrderStatus status,
         String currency,
+        OrderPaymentMethod paymentMethod,
         OrderPaymentStatus paymentStatus,
         BigDecimal paymentDueAmount,
+        LocalDateTime paymentDueAt,
         String paymentProvider,
         String paymentProviderOrderId,
         String paymentProviderReference,
+        String paymentCollectedBy,
+        String paymentCollectionReference,
         LocalDateTime paidAt,
+        OrderCancellationStatus cancellationStatus,
+        String cancellationReason,
+        LocalDateTime cancellationRequestedAt,
+        String cancellationDecisionNote,
         OrderRefundSummaryResponse refundSummary,
         List<OrderRefundResponse> refunds,
         LocalDateTime createdAt,

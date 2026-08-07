@@ -69,6 +69,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import com.agriplatform.backend.payment.dto.CreateOrderRefundRequest;
 import com.agriplatform.backend.payment.dto.OrderRefundResponse;
+import com.agriplatform.backend.payment.dto.CompleteManualRefundRequest;
 import com.agriplatform.backend.payment.service.OrderRefundService;
 import org.springframework.security.core.Authentication;
 
@@ -116,6 +117,24 @@ public class OrderController {
         return orderService.updateStatus(id, request);
     }
 
+    @PostMapping("/{id}/payment")
+    public OrderResponse markOfflinePayment(
+            @PathVariable Long id,
+            @Valid @RequestBody MarkOrderPaymentRequest request,
+            Authentication authentication
+    ) {
+        return orderService.markOfflinePayment(id, request, authentication.getName());
+    }
+
+    @PostMapping("/{id}/cancellation-decision")
+    public OrderResponse decideCancellation(
+            @PathVariable Long id,
+            @Valid @RequestBody CancellationDecisionRequest request,
+            Authentication authentication
+    ) {
+        return orderService.decideCancellation(id, request, authentication.getName());
+    }
+
     @PostMapping("/{id}/refunds")
     public OrderRefundResponse createRefund(
             @PathVariable Long id,
@@ -128,5 +147,15 @@ public class OrderController {
     @PostMapping("/{id}/refunds/sync")
     public List<OrderRefundResponse> syncRefunds(@PathVariable Long id) {
         return orderRefundService.syncRefunds(id);
+    }
+
+    @PostMapping("/{id}/refunds/{refundId}/complete")
+    public OrderRefundResponse completeManualRefund(
+            @PathVariable Long id,
+            @PathVariable Long refundId,
+            @Valid @RequestBody CompleteManualRefundRequest request,
+            Authentication authentication
+    ) {
+        return orderRefundService.completeManualRefund(id, refundId, request, authentication.getName());
     }
 }
