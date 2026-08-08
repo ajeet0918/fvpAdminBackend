@@ -65,4 +65,5 @@ public interface InvestorAccountRepository extends JpaRepository<InvestorAccount
     List<InvestorAccount> findAllByOrderByUpdatedAtDesc();
     List<InvestorAccount> findByEmailIgnoreCaseOrPhoneOrderByCreatedAtDesc(String email, String phone);
     Optional<InvestorAccount> findByEmailIgnoreCaseAndPhone(String email, String phone);
+    Optional<InvestorAccount> findBySourceInquiryId(Long sourceInquiryId);
 }

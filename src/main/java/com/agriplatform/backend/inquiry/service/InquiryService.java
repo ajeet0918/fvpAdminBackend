@@ -304,6 +304,20 @@ public class InquiryService {
         PaymentStatus paymentStatus = parsePaymentStatusNullable(request.paymentStatus());
         String agreementId = normalizeNullable(request.agreementId());
         InquiryType resolvedType = resolveInquiryType(inquiry);
+        if (resolvedType == InquiryType.INVESTOR) {
+            if ((paymentStatus == PaymentStatus.RECEIVED || paymentStatus == PaymentStatus.VERIFIED)
+                    && paymentStatus != inquiry.getPaymentStatus()) {
+                throw new IllegalArgumentException("Investor payment status is updated only by the verified payment workflow");
+            }
+            if (agreementId != null && !agreementId.equals(inquiry.getAgreementId())) {
+                throw new IllegalArgumentException("Investor agreement ID is managed by the investor onboarding workflow");
+            }
+            if (request.committedReturnAmount() != null
+                    && request.committedReturnAmount().compareTo(inquiry.getCommittedReturnAmount() == null
+                            ? BigDecimal.ZERO : inquiry.getCommittedReturnAmount()) != 0) {
+                throw new IllegalArgumentException("Investor committed return is managed by the investor onboarding workflow");
+            }
+        }
         if (agreementId == null
                 && resolvedType == InquiryType.INVESTOR
                 && (paymentStatus == PaymentStatus.RECEIVED || paymentStatus == PaymentStatus.VERIFIED)
@@ -329,6 +343,10 @@ public class InquiryService {
     public InquiryResponse convertToLead(Long inquiryId, ConvertInquiryToLeadRequest request) {
         Inquiry inquiry = inquiryRepository.findById(inquiryId)
                 .orElseThrow(() -> new IllegalArgumentException("Inquiry not found"));
+
+        if (resolveInquiryType(inquiry) == InquiryType.INVESTOR) {
+            throw new IllegalArgumentException("Investor inquiries use the approval and payment onboarding workflow");
+        }
 
         if (inquiry.getConvertedLeadId() != null || inquiry.getStatus() == InquiryStatus.CONVERTED) {
             throw new IllegalArgumentException("Inquiry already converted");

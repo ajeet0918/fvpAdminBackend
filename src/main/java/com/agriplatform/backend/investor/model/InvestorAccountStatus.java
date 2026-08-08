@@ -58,6 +58,7 @@ import com.agriplatform.backend.user.service.*;
 
 public enum InvestorAccountStatus {
     PENDING_VERIFICATION,
+    PENDING_PAYMENT,
     ACTIVE,
     SUSPENDED,
     CLOSED
