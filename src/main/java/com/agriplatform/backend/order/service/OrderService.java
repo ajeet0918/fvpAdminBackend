@@ -7,6 +7,7 @@ import com.agriplatform.backend.customer.repository.CustomerRepository;
 import com.agriplatform.backend.order.dto.CreateCustomerOrderRequest;
 import com.agriplatform.backend.order.dto.CreateOrderItemRequest;
 import com.agriplatform.backend.order.dto.CreateOrderRequest;
+import com.agriplatform.backend.order.dto.LocalPaymentOutcome;
 import com.agriplatform.backend.order.dto.OrderItemResponse;
 import com.agriplatform.backend.order.dto.OrderResponse;
 import com.agriplatform.backend.order.dto.OrderStatusHistoryResponse;
@@ -34,6 +35,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -390,6 +392,27 @@ public class OrderService {
         purchaseOrder.markPaymentFailed(providerReference);
         purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), "Payment failed from gateway."));
         return purchaseOrderRepository.save(purchaseOrder);
+    }
+
+    @Transactional
+    public OrderResponse completeLocalPayment(Long orderId, LocalPaymentOutcome outcome) {
+        PurchaseOrder purchaseOrder = getOrderEntity(orderId);
+        if (purchaseOrder.getPaymentStatus() == OrderPaymentStatus.PAID) {
+            return mapOrder(purchaseOrder);
+        }
+        String providerReference = "LOCAL-TEST-" + UUID.randomUUID();
+        if (outcome == LocalPaymentOutcome.SUCCESS) {
+            purchaseOrder.markPaymentPaid(providerReference);
+            purchaseOrder.addStatusHistory(new OrderStatusHistory(
+                    purchaseOrder.getStatus(), "Local payment simulator marked payment successful."
+            ));
+        } else {
+            purchaseOrder.markPaymentFailed(providerReference);
+            purchaseOrder.addStatusHistory(new OrderStatusHistory(
+                    purchaseOrder.getStatus(), "Local payment simulator marked payment failed."
+            ));
+        }
+        return mapOrder(purchaseOrderRepository.save(purchaseOrder));
     }
 
     @Transactional(readOnly = true)

@@ -4,6 +4,7 @@ import com.agriplatform.backend.customer.model.Customer;
 import com.agriplatform.backend.customer.repository.CustomerRepository;
 import com.agriplatform.backend.order.dto.CreateOrderPaymentSessionRequest;
 import com.agriplatform.backend.order.dto.CreateCustomerOrderRequest;
+import com.agriplatform.backend.order.dto.CompleteLocalPaymentRequest;
 import com.agriplatform.backend.order.dto.OrderPaymentSessionResponse;
 import com.agriplatform.backend.order.dto.OrderResponse;
 import com.agriplatform.backend.order.dto.CustomerCancellationRequest;
@@ -15,15 +16,19 @@ import com.agriplatform.backend.order.service.OrderService;
 import com.agriplatform.backend.payment.dto.CashfreeCreateOrderResult;
 import com.agriplatform.backend.payment.dto.CashfreeOrderStatusResult;
 import com.agriplatform.backend.payment.service.CashfreeApiConstants;
+import com.agriplatform.backend.payment.config.LocalPaymentSimulatorProperties;
 import com.agriplatform.backend.payment.service.CashfreeGatewayService;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CustomerOrderService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CustomerOrderService.class);
 
+    private static final String LOCAL_PAYMENT_PROVIDER = "LOCAL_TEST";
+    private final LocalPaymentSimulatorProperties localPaymentSimulatorProperties;
     private final OrderService orderService;
     private final CustomerRepository customerRepository;
     private final CashfreeGatewayService cashfreeGatewayService;
@@ -33,9 +38,20 @@ public class CustomerOrderService {
             CustomerRepository customerRepository,
             CashfreeGatewayService cashfreeGatewayService
     ) {
+        this(orderService, customerRepository, cashfreeGatewayService, new LocalPaymentSimulatorProperties());
+    }
+
+    @Autowired
+    public CustomerOrderService(
+            OrderService orderService,
+            CustomerRepository customerRepository,
+            CashfreeGatewayService cashfreeGatewayService,
+            LocalPaymentSimulatorProperties localPaymentSimulatorProperties
+    ) {
         this.orderService = orderService;
         this.customerRepository = customerRepository;
         this.cashfreeGatewayService = cashfreeGatewayService;
+        this.localPaymentSimulatorProperties = localPaymentSimulatorProperties;
     }
 
     public OrderPaymentSessionResponse createDirectOrder(Long customerId, CreateCustomerOrderRequest request) {
@@ -54,12 +70,18 @@ public class CustomerOrderService {
         // Persist payment intent first so order lifecycle is not lost if gateway is unavailable.
         PurchaseOrder pendingOrder = orderService.markPaymentPending(
                 orderResponse.id(),
-                CashfreeApiConstants.GATEWAY_NAME,
+                localPaymentSimulatorProperties.isEnabled() ? LOCAL_PAYMENT_PROVIDER : CashfreeApiConstants.GATEWAY_NAME,
                 null,
                 orderResponse.totalAmount(),
                 "Payment initiation requested."
         );
 
+        if (localPaymentSimulatorProperties.isEnabled()) {
+            return localPaymentResponse(
+                    pendingOrder,
+                    "Local payment simulator is active. Choose a test outcome below."
+            );
+        }
         if (!cashfreeGatewayService.isEnabled()) {
             return new OrderPaymentSessionResponse(
                     pendingOrder.getId(),
@@ -101,6 +123,19 @@ public class CustomerOrderService {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
 
+        if (localPaymentSimulatorProperties.isEnabled()) {
+            PurchaseOrder pendingOrder = orderService.markPaymentPending(
+                    order.getId(),
+                    LOCAL_PAYMENT_PROVIDER,
+                    null,
+                    order.getTotalAmount(),
+                    "Local payment simulator session created."
+            );
+            return localPaymentResponse(
+                    pendingOrder,
+                    "Local payment simulator is active. Choose a test outcome below."
+            );
+        }
         return resolveRetryPaymentSession(order, customer, request);
     }
 
@@ -110,6 +145,23 @@ public class CustomerOrderService {
 
     public OrderResponse requestCancellation(Long customerId, Long orderId, CustomerCancellationRequest request) {
         return orderService.requestCancellation(customerId, orderId, request);
+    }
+    public OrderResponse completeLocalPayment(
+            Long customerId,
+            Long orderId,
+            CompleteLocalPaymentRequest request
+    ) {
+        if (!localPaymentSimulatorProperties.isEnabled()) {
+            throw new IllegalArgumentException("Local payment simulator is disabled");
+        }
+        PurchaseOrder order = orderService.getOrderEntityForOperations(orderId);
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customerId)) {
+            throw new IllegalArgumentException("Order does not belong to this customer");
+        }
+        if (order.getPaymentProvider() == null || !LOCAL_PAYMENT_PROVIDER.equals(order.getPaymentProvider())) {
+            throw new IllegalArgumentException("This order is not using the local payment simulator");
+        }
+        return orderService.completeLocalPayment(orderId, request.outcome());
     }
 
     private OrderPaymentSessionResponse tryCreateGatewaySession(
@@ -275,6 +327,17 @@ public class CustomerOrderService {
                 order.getPaymentProvider(),
                 order.getPaymentProviderOrderId(),
                 "",
+                "",
+                message
+        );
+    }
+    private OrderPaymentSessionResponse localPaymentResponse(PurchaseOrder order, String message) {
+        return new OrderPaymentSessionResponse(
+                order.getId(),
+                order.getOrderNumber(),
+                LOCAL_PAYMENT_PROVIDER,
+                order.getOrderNumber(),
+                "local-session-" + order.getId(),
                 "",
                 message
         );

@@ -9,6 +9,7 @@ import com.agriplatform.backend.customer.service.CustomerAccountService;
 import com.agriplatform.backend.customer.service.CustomerAuthService;
 import com.agriplatform.backend.customer.service.CustomerOrderService;
 import com.agriplatform.backend.order.dto.CreateOrderPaymentSessionRequest;
+import com.agriplatform.backend.order.dto.CompleteLocalPaymentRequest;
 import com.agriplatform.backend.order.dto.CreateCustomerOrderRequest;
 import com.agriplatform.backend.order.dto.OrderPaymentSessionResponse;
 import com.agriplatform.backend.order.dto.OrderResponse;
@@ -113,6 +114,15 @@ public class CustomerAccountController {
     ) {
         return customerOrderService.retryPaymentSession(resolveCustomerId(authentication), orderId, request);
     }
+    @PostMapping("/orders/{orderId}/local-payment")
+    public OrderResponse completeLocalPayment(
+            Authentication authentication,
+            @PathVariable Long orderId,
+            @Valid @RequestBody CompleteLocalPaymentRequest request
+    ) {
+        return customerOrderService.completeLocalPayment(resolveCustomerId(authentication), orderId, request);
+    }
+
 
     @PostMapping("/orders/{orderId}/cancellation-request")
     public OrderResponse requestCancellation(
