@@ -57,6 +57,7 @@ import com.agriplatform.backend.user.repository.*;
 import com.agriplatform.backend.user.service.*;
 
 public enum InvestmentStatus {
+    PENDING_PAYMENT,
     ACTIVE,
     PAUSED,
     CLOSED

@@ -23,7 +23,7 @@ public class AppSetting {
     @Column(nullable = false, length = 80)
     private String category;
 
-    @Column(length = 4000)
+    @Column(columnDefinition = "TEXT")
     private String settingValue;
 
     @Enumerated(EnumType.STRING)
@@ -136,4 +136,3 @@ public class AppSetting {
         this.updatedAt = LocalDateTime.now();
     }
 }
-
