@@ -433,9 +433,12 @@ public class InvestorOnboardingService {
     }
 
     private LocalDateTime parseEventTime(String eventTime) {
+        if (eventTime == null || eventTime.isBlank()) {
+            throw new IllegalArgumentException("Invalid Cashfree payment-link event time");
+        }
         try {
             return OffsetDateTime.parse(eventTime).atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
-        } catch (DateTimeParseException | NullPointerException ex) {
+        } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException("Invalid Cashfree payment-link event time", ex);
         }
     }

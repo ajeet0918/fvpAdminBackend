@@ -69,4 +69,8 @@ public class InvestorPaymentEvent {
         this.payloadSnapshot = payloadSnapshot;
         this.createdAt = LocalDateTime.now();
     }
+
+    public LocalDateTime getEventTime() {
+        return eventTime;
+    }
 }
