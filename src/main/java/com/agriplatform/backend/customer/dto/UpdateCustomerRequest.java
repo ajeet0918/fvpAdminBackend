@@ -69,6 +69,7 @@ public record UpdateCustomerRequest(
         @NotBlank @Size(max = 120) String city,
         @NotBlank @Size(max = 120) String state,
         @NotBlank @Size(max = 20) String postalCode,
-        boolean active
+        boolean active,
+        boolean deferredPaymentEligible
 ) {
 }

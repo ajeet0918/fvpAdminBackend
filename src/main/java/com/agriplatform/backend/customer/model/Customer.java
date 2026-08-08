@@ -64,6 +64,9 @@ public class Customer {
     private boolean active;
 
     @Column(nullable = false)
+    private boolean deferredPaymentEligible;
+
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
@@ -93,6 +96,7 @@ public class Customer {
         this.authProvider = CustomerAuthProvider.LOCAL;
         this.emailVerified = false;
         this.active = true;
+        this.deferredPaymentEligible = false;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
     }
@@ -161,6 +165,10 @@ public class Customer {
         return active;
     }
 
+    public boolean isDeferredPaymentEligible() {
+        return deferredPaymentEligible;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -216,6 +224,11 @@ public class Customer {
 
     public void setActive(boolean active) {
         this.active = active;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void setDeferredPaymentEligible(boolean eligible) {
+        this.deferredPaymentEligible = eligible;
         this.updatedAt = LocalDateTime.now();
     }
 }

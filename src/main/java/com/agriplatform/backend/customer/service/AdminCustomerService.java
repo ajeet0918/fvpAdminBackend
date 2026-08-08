@@ -131,6 +131,7 @@ public class AdminCustomerService {
                 request.postalCode().trim()
         );
         customer.setActive(request.active());
+        customer.setDeferredPaymentEligible(request.deferredPaymentEligible());
 
         Customer saved = customerRepository.save(customer);
         List<PurchaseOrder> orders = purchaseOrderRepository.findByCustomer_IdOrderByCreatedAtDesc(id);
@@ -158,6 +159,7 @@ public class AdminCustomerService {
                 customer.getState(),
                 customer.getPostalCode(),
                 customer.isActive(),
+                customer.isDeferredPaymentEligible(),
                 customer.isActive() ? "ACTIVE" : "INACTIVE",
                 customer.getCreatedAt(),
                 customer.getUpdatedAt(),

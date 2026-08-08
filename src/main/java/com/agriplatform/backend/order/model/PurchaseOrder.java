@@ -127,8 +127,14 @@ public class PurchaseOrder {
     @Column(nullable = false, length = 30)
     private OrderPaymentStatus paymentStatus;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 40)
+    private OrderPaymentMethod paymentMethod;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal paymentDueAmount;
+
+    private LocalDateTime paymentDueAt;
 
     @Column(length = 80)
     private String paymentProvider;
@@ -138,6 +144,27 @@ public class PurchaseOrder {
 
     @Column(length = 140)
     private String paymentProviderReference;
+
+    @Column(length = 120)
+    private String paymentCollectedBy;
+
+    @Column(length = 140)
+    private String paymentCollectionReference;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrderCancellationStatus cancellationStatus;
+
+    @Column(length = 600)
+    private String cancellationReason;
+
+    @Column(length = 120)
+    private String cancellationRequestedBy;
+
+    private LocalDateTime cancellationRequestedAt;
+
+    @Column(length = 600)
+    private String cancellationDecisionNote;
 
     private LocalDateTime paidAt;
 
@@ -215,7 +242,9 @@ public class PurchaseOrder {
         this.customerNotes = customerNotes;
         this.status = PurchaseOrderStatus.PENDING_REVIEW;
         this.currency = "INR";
+        this.paymentMethod = OrderPaymentMethod.ONLINE;
         this.paymentStatus = OrderPaymentStatus.NOT_INITIATED;
+        this.cancellationStatus = OrderCancellationStatus.NONE;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -279,8 +308,16 @@ public class PurchaseOrder {
         return paymentStatus;
     }
 
+    public OrderPaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
     public BigDecimal getPaymentDueAmount() {
         return paymentDueAmount;
+    }
+
+    public LocalDateTime getPaymentDueAt() {
+        return paymentDueAt;
     }
 
     public String getPaymentProvider() {
@@ -293,6 +330,34 @@ public class PurchaseOrder {
 
     public String getPaymentProviderReference() {
         return paymentProviderReference;
+    }
+
+    public String getPaymentCollectedBy() {
+        return paymentCollectedBy;
+    }
+
+    public String getPaymentCollectionReference() {
+        return paymentCollectionReference;
+    }
+
+    public OrderCancellationStatus getCancellationStatus() {
+        return cancellationStatus;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public String getCancellationRequestedBy() {
+        return cancellationRequestedBy;
+    }
+
+    public LocalDateTime getCancellationRequestedAt() {
+        return cancellationRequestedAt;
+    }
+
+    public String getCancellationDecisionNote() {
+        return cancellationDecisionNote;
     }
 
     public LocalDateTime getPaidAt() {
@@ -446,6 +511,46 @@ public class PurchaseOrder {
         this.paymentProviderOrderId = providerOrderId;
         this.paymentDueAmount = dueAmount;
         this.paymentStatus = OrderPaymentStatus.PENDING;
+    }
+
+    public void configurePaymentMethod(OrderPaymentMethod method, BigDecimal dueAmount) {
+        this.paymentMethod = method == null ? OrderPaymentMethod.ONLINE : method;
+        this.paymentDueAmount = dueAmount;
+        if (this.paymentMethod == OrderPaymentMethod.CASH_ON_DELIVERY
+                || this.paymentMethod == OrderPaymentMethod.PAY_AFTER_DELIVERY_ONLINE) {
+            this.paymentStatus = OrderPaymentStatus.DUE;
+            this.paymentProvider = this.paymentMethod == OrderPaymentMethod.CASH_ON_DELIVERY ? "COD" : null;
+            this.paymentDueAt = null;
+        }
+    }
+
+    public void markOfflinePaymentPaid(String provider, String reference, String collectedBy) {
+        this.paymentProvider = provider;
+        this.paymentProviderReference = reference;
+        this.paymentCollectedBy = collectedBy;
+        this.paymentCollectionReference = reference;
+        this.paymentStatus = OrderPaymentStatus.PAID;
+        this.paidAt = LocalDateTime.now();
+    }
+
+    public void prepareOnlinePaymentAfterDelivery() {
+        this.paymentMethod = OrderPaymentMethod.PAY_AFTER_DELIVERY_ONLINE;
+    }
+
+    public void markPaymentDueAt(LocalDateTime dueAt) {
+        this.paymentDueAt = dueAt;
+    }
+
+    public void requestCancellation(String reason, String requestedBy) {
+        this.cancellationStatus = OrderCancellationStatus.REQUESTED;
+        this.cancellationReason = reason;
+        this.cancellationRequestedBy = requestedBy;
+        this.cancellationRequestedAt = LocalDateTime.now();
+    }
+
+    public void decideCancellation(boolean approved, String note) {
+        this.cancellationStatus = approved ? OrderCancellationStatus.APPROVED : OrderCancellationStatus.REJECTED;
+        this.cancellationDecisionNote = note;
     }
 
     public void markPaymentPaid(String providerReference) {

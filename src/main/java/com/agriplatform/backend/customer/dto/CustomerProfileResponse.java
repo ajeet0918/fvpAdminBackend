@@ -11,6 +11,7 @@ public record CustomerProfileResponse(
         String state,
         String postalCode,
         String preferredPaymentMethod,
-        String preferredPaymentHandle
+        String preferredPaymentHandle,
+        boolean deferredPaymentEligible
 ) {
 }

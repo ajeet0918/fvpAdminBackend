@@ -10,11 +10,16 @@ import com.agriplatform.backend.order.dto.CreateOrderRequest;
 import com.agriplatform.backend.order.dto.OrderItemResponse;
 import com.agriplatform.backend.order.dto.OrderResponse;
 import com.agriplatform.backend.order.dto.OrderStatusHistoryResponse;
+import com.agriplatform.backend.order.dto.CancellationDecisionRequest;
+import com.agriplatform.backend.order.dto.CustomerCancellationRequest;
+import com.agriplatform.backend.order.dto.MarkOrderPaymentRequest;
 import com.agriplatform.backend.order.dto.QuoteOrderItemRequest;
 import com.agriplatform.backend.order.dto.QuoteOrderRequest;
 import com.agriplatform.backend.order.dto.UpdateOrderStatusRequest;
 import com.agriplatform.backend.order.model.OrderItem;
 import com.agriplatform.backend.order.model.OrderPaymentStatus;
+import com.agriplatform.backend.order.model.OrderPaymentMethod;
+import com.agriplatform.backend.order.model.OrderCancellationStatus;
 import com.agriplatform.backend.order.model.OrderStatusHistory;
 import com.agriplatform.backend.order.model.PurchaseOrder;
 import com.agriplatform.backend.order.model.PurchaseOrderStatus;
@@ -120,6 +125,11 @@ public class OrderService {
                 .forEach(purchaseOrder::addItem);
 
         applyAutomaticPricing(purchaseOrder, "Customer checkout pricing applied.");
+        if (request.paymentMethod() == com.agriplatform.backend.order.model.OrderPaymentMethod.PAY_AFTER_DELIVERY_ONLINE
+                && !customer.isDeferredPaymentEligible()) {
+            throw new IllegalArgumentException("Pay-after-delivery is available only to approved business accounts");
+        }
+        purchaseOrder.configurePaymentMethod(request.paymentMethod(), purchaseOrder.getTotalAmount());
         purchaseOrder.updateStatus(PurchaseOrderStatus.CONFIRMED, "Direct order created from customer account.");
         purchaseOrder.addStatusHistory(new OrderStatusHistory(
                 PurchaseOrderStatus.CONFIRMED,
@@ -253,6 +263,9 @@ public class OrderService {
     @Transactional
     public OrderResponse updateStatus(Long id, UpdateOrderStatusRequest request) {
         PurchaseOrder purchaseOrder = getOrderEntity(id);
+        if (request.status() == PurchaseOrderStatus.CANCELLED && !isCancellationWindow(purchaseOrder.getStatus())) {
+            throw new IllegalArgumentException("Cancellation is only allowed before processing or dispatch");
+        }
         purchaseOrder.updateStatus(request.status(), request.adminNotes());
         purchaseOrder.addStatusHistory(new OrderStatusHistory(
                 request.status(),
@@ -260,6 +273,73 @@ public class OrderService {
                         ? buildStatusNote(request.status())
                         : request.adminNotes()
         ));
+        return mapOrder(purchaseOrderRepository.save(purchaseOrder));
+    }
+
+    @Transactional
+    public OrderResponse markOfflinePayment(Long id, MarkOrderPaymentRequest request, String collectedBy) {
+        if (request.paymentMethod() != OrderPaymentMethod.CASH
+                && request.paymentMethod() != OrderPaymentMethod.BANK_TRANSFER) {
+            throw new IllegalArgumentException("Offline payment must be marked as cash or bank transfer");
+        }
+        PurchaseOrder purchaseOrder = getOrderEntity(id);
+        if (purchaseOrder.getStatus() == PurchaseOrderStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cancelled orders cannot receive payment");
+        }
+        if (purchaseOrder.getPaymentStatus() == OrderPaymentStatus.PAID) {
+            throw new IllegalArgumentException("Payment is already marked as paid");
+        }
+        String reference = request.reference().trim();
+        purchaseOrder.markOfflinePaymentPaid(request.paymentMethod().name(), reference, collectedBy);
+        purchaseOrder.addStatusHistory(new OrderStatusHistory(
+                purchaseOrder.getStatus(),
+                request.note() == null || request.note().isBlank()
+                        ? "Offline payment recorded: " + reference
+                        : request.note().trim()
+        ));
+        return mapOrder(purchaseOrderRepository.save(purchaseOrder));
+    }
+
+    @Transactional
+    public OrderResponse requestCancellation(Long customerId, Long orderId, CustomerCancellationRequest request) {
+        PurchaseOrder purchaseOrder = getOrderEntity(orderId);
+        if (purchaseOrder.getCustomer() == null
+                || !purchaseOrder.getCustomer().getId().equals(customerId)) {
+            throw new IllegalArgumentException("Order does not belong to this customer");
+        }
+        if (!isCancellationWindow(purchaseOrder.getStatus())) {
+            throw new IllegalArgumentException("Cancellation requests are closed after processing or dispatch");
+        }
+        if (purchaseOrder.getCancellationStatus() == OrderCancellationStatus.REQUESTED) {
+            throw new IllegalArgumentException("A cancellation request is already pending");
+        }
+        String reason = request.reason().trim();
+        purchaseOrder.requestCancellation(reason, "CUSTOMER:" + customerId);
+        purchaseOrder.addStatusHistory(new OrderStatusHistory(
+                purchaseOrder.getStatus(), "Customer requested cancellation: " + reason
+        ));
+        return mapOrder(purchaseOrderRepository.save(purchaseOrder));
+    }
+
+    @Transactional
+    public OrderResponse decideCancellation(Long id, CancellationDecisionRequest request, String decidedBy) {
+        PurchaseOrder purchaseOrder = getOrderEntity(id);
+        if (purchaseOrder.getCancellationStatus() != OrderCancellationStatus.REQUESTED) {
+            throw new IllegalArgumentException("This order has no pending cancellation request");
+        }
+        if (request.approved() && !isCancellationWindow(purchaseOrder.getStatus())) {
+            throw new IllegalArgumentException("Cancellation cannot be approved after processing or dispatch");
+        }
+        String note = request.note() == null || request.note().isBlank()
+                ? (request.approved() ? "Cancellation approved by " : "Cancellation rejected by ") + decidedBy
+                : request.note().trim();
+        purchaseOrder.decideCancellation(request.approved(), note);
+        if (request.approved()) {
+            purchaseOrder.updateStatus(PurchaseOrderStatus.CANCELLED, note);
+            purchaseOrder.addStatusHistory(new OrderStatusHistory(PurchaseOrderStatus.CANCELLED, note));
+        } else {
+            purchaseOrder.addStatusHistory(new OrderStatusHistory(purchaseOrder.getStatus(), note));
+        }
         return mapOrder(purchaseOrderRepository.save(purchaseOrder));
     }
 
@@ -322,6 +402,12 @@ public class OrderService {
     private PurchaseOrder getOrderEntity(Long id) {
         return purchaseOrderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+    }
+
+    private boolean isCancellationWindow(PurchaseOrderStatus status) {
+        return status == PurchaseOrderStatus.PENDING_REVIEW
+                || status == PurchaseOrderStatus.QUOTED
+                || status == PurchaseOrderStatus.CONFIRMED;
     }
 
     @Transactional(readOnly = true)
@@ -521,12 +607,20 @@ public class OrderService {
                 purchaseOrder.getCustomerNotes(),
                 purchaseOrder.getStatus(),
                 purchaseOrder.getCurrency(),
+                purchaseOrder.getPaymentMethod(),
                 purchaseOrder.getPaymentStatus(),
                 purchaseOrder.getPaymentDueAmount(),
+                purchaseOrder.getPaymentDueAt(),
                 purchaseOrder.getPaymentProvider(),
                 purchaseOrder.getPaymentProviderOrderId(),
                 purchaseOrder.getPaymentProviderReference(),
+                purchaseOrder.getPaymentCollectedBy(),
+                purchaseOrder.getPaymentCollectionReference(),
                 purchaseOrder.getPaidAt(),
+                purchaseOrder.getCancellationStatus(),
+                purchaseOrder.getCancellationReason(),
+                purchaseOrder.getCancellationRequestedAt(),
+                purchaseOrder.getCancellationDecisionNote(),
                 orderRefundService.summarize(purchaseOrder),
                 orderRefundService.toResponses(purchaseOrder),
                 purchaseOrder.getCreatedAt(),

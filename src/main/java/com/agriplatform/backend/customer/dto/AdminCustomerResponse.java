@@ -69,6 +69,7 @@ public record AdminCustomerResponse(
         String state,
         String postalCode,
         boolean active,
+        boolean deferredPaymentEligible,
         String status,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,

@@ -12,6 +12,7 @@ import com.agriplatform.backend.order.dto.CreateOrderPaymentSessionRequest;
 import com.agriplatform.backend.order.dto.CreateCustomerOrderRequest;
 import com.agriplatform.backend.order.dto.OrderPaymentSessionResponse;
 import com.agriplatform.backend.order.dto.OrderResponse;
+import com.agriplatform.backend.order.dto.CustomerCancellationRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.core.Authentication;
@@ -111,6 +112,15 @@ public class CustomerAccountController {
             @Valid @RequestBody CreateOrderPaymentSessionRequest request
     ) {
         return customerOrderService.retryPaymentSession(resolveCustomerId(authentication), orderId, request);
+    }
+
+    @PostMapping("/orders/{orderId}/cancellation-request")
+    public OrderResponse requestCancellation(
+            Authentication authentication,
+            @PathVariable Long orderId,
+            @Valid @RequestBody CustomerCancellationRequest request
+    ) {
+        return customerOrderService.requestCancellation(resolveCustomerId(authentication), orderId, request);
     }
 
     private Long resolveCustomerId(Authentication authentication) {
