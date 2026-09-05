@@ -804,7 +804,7 @@ public class InvestorPlatformService {
                 stream.addRect(margin, y - 58, pageWidth, 58);
                 stream.fill();
 
-                writePdfText(stream, "FVP Purepick Suppliers OPC Pvt. Ltd.", margin + 12, y - 23, PDType1Font.HELVETICA_BOLD, 14, true);
+                writePdfText(stream, "FVP Purepick Suppliers Pvt. Ltd.", margin + 12, y - 23, PDType1Font.HELVETICA_BOLD, 14, true);
                 writePdfText(stream, "Investor Payout Receipt", margin + 12, y - 41, PDType1Font.HELVETICA, 11, true);
 
                 y -= 76;
